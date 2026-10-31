@@ -1,4 +1,3 @@
-
 <?php
 
 defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed');
@@ -13,6 +12,7 @@ class EventsModel extends Model
 
     protected $fillable = [
         'category_id',
+        'dept_id',
         'title',
         'description',
         'venue',

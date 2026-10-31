@@ -561,32 +561,39 @@ class Api
      * @return array<string,mixed>
      */
     public function require_jwt()
-    {
-        $token = $this->get_bearer_token();
-        $payload = $this->validate_jwt($token ?? '');
+{
+    $token = $this->get_bearer_token();
+    $payload = $this->validate_jwt($token ?? '');
 
-        if (!$payload) {
+    if (!$payload) {
+        $this->respond_error('Unauthorized', 401);
+    }
+
+    if ($this->verify_user) {
+        $stmt = $this->_lava->db->raw(
+            "SELECT user_id, role
+             FROM {$this->users_table}
+             WHERE user_id = ?
+             LIMIT 1",
+            [$payload['sub']]
+        );
+
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$user) {
             $this->respond_error('Unauthorized', 401);
         }
 
-        if ($this->verify_user) {
-            $stmt = $this->_lava->db->raw(
-                "SELECT id, role FROM {$this->users_table} WHERE id = ? LIMIT 1",
-                [$payload['sub']]
-            );
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$user) {
-                $this->respond_error('Unauthorized', 401);
-            }
-
-            // Server-side values win over whatever the token claims.
-            $payload['role']   = $user['role'];
-            $payload['scopes'] = $this->scopes_for_role($user['role']);
-        }
-
-        return $payload;
+        // Always use the role stored in the database.
+        $payload['sub'] = (string) $user['user_id'];
+        $payload['role'] = $user['role'];
+        $payload['scopes'] = $this->scopes_for_role(
+            $user['role']
+        );
     }
+
+    return $payload;
+}
 
     // --------------------------
     // Auth: Token System
@@ -646,50 +653,70 @@ class Api
      * @param string $refresh_token
      * @return void
      */
-    public function refresh_access_token($refresh_token)
-    {
-        // Only a token explicitly typed as "refresh" is accepted here.
-        $payload = $this->validate_jwt($refresh_token, 'refresh');
-        if (!$payload) {
-            $this->respond_error('Invalid refresh token', 403);
-        }
+public function refresh_access_token($refresh_token)
+{
+    $payload = $this->validate_jwt(
+        $refresh_token,
+        'refresh'
+    );
 
-        $hashed = hash_hmac('sha256', $refresh_token, $this->refresh_token_key);
-
-        $stmt = $this->_lava->db->raw(
-            "SELECT * FROM {$this->refresh_token_table} 
-            WHERE token = ? AND expires_at > NOW() LIMIT 1",
-            [$hashed]
-        );
-        $found = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$found) {
-            $this->respond_error('Refresh token expired or revoked', 403);
-        }
-
-        $user_stmt = $this->_lava->db->raw(
-            "SELECT id, role FROM {$this->users_table} WHERE id = ? LIMIT 1",
-            [$payload['sub']]
-        );
-        $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$user) {
-            $this->respond_error('User not found', 403);
-        }
-
-        $this->revoke_refresh_token($refresh_token);
-
-        $new_tokens = $this->issue_tokens([
-            'id'     => $user['id'],
-            'role'   => $user['role'],
-            'scopes' => $this->scopes_for_role($user['role']),
-        ]);
-
-        $this->respond([
-            'message' => 'Tokens refreshed successfully',
-            'tokens'  => $new_tokens
-        ]);
+    if (!$payload) {
+        $this->respond_error('Invalid refresh token', 403);
     }
+
+    $hashed = hash_hmac(
+        'sha256',
+        $refresh_token,
+        $this->refresh_token_key
+    );
+
+    $stmt = $this->_lava->db->raw(
+        "SELECT *
+         FROM {$this->refresh_token_table}
+         WHERE token = ?
+           AND expires_at > NOW()
+         LIMIT 1",
+        [$hashed]
+    );
+
+    $found = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$found) {
+        $this->respond_error(
+            'Refresh token expired or revoked',
+            403
+        );
+    }
+
+    $user_stmt = $this->_lava->db->raw(
+        "SELECT user_id, role
+         FROM {$this->users_table}
+         WHERE user_id = ?
+         LIMIT 1",
+        [$payload['sub']]
+    );
+
+    $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$user) {
+        $this->respond_error('User not found', 403);
+    }
+
+    $this->revoke_refresh_token($refresh_token);
+
+    $new_tokens = $this->issue_tokens([
+        'id' => $user['user_id'],
+        'role' => $user['role'],
+        'scopes' => $this->scopes_for_role(
+            $user['role']
+        ),
+    ]);
+
+    $this->respond([
+        'message' => 'Tokens refreshed successfully',
+        'tokens' => $new_tokens
+    ]);
+}
 
     /**
      * revoke_refresh_token

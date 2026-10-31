@@ -183,6 +183,25 @@ $database['main'] = array(
 $config['base_url'] = 'http://localhost:3000/';
 ```
 
+### Google Calendar
+
+CCS event creation, edits, and deletion are synced to the department's
+Google Calendar. The CCS Events page also has a **Sync Calendar** action to
+push existing department events.
+
+Set `GOOGLE_CALENDAR_CREDENTIALS` in `.env` to the path of a Google service
+account JSON key file. Keep that key outside `public/` and out of version
+control. Set `GOOGLE_CALENDAR_CCS_ID` to the CCS calendar ID and share that
+calendar with the service account's email address with **Make changes to
+events** permission. The other department calendar IDs are optional unless
+those departments use Calendar sync.
+
+The Calendar API must be enabled in the Google Cloud project. HTTPS
+certificate verification uses the system CA store or Composer's CA bundle.
+If PHP needs a custom CA file, set `GOOGLE_CALENDAR_CA_BUNDLE` to its PEM path.
+Do not disable TLS verification. Event times use `GOOGLE_CALENDAR_TIMEZONE`,
+which defaults to `Asia/Manila`.
+
 ---
 
 ## Building a REST API

@@ -1,16 +1,17 @@
 <?php
 
+defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed');
+
 class AuthController extends Controller
 {
     public function __construct()
     {
         parent::__construct();
+
         $this->call->library('api');
+        $this->call->database();
     }
 
-    /**
-     * POST /api/auth/register
-     */
     public function register()
     {
         $this->api->require_method('POST');
@@ -41,7 +42,6 @@ class AuthController extends Controller
             );
         }
 
-        // Check whether the email is already registered.
         $existingEmail = $this->db->raw(
             'SELECT user_id FROM users WHERE email = ? LIMIT 1',
             [$email]
@@ -54,7 +54,6 @@ class AuthController extends Controller
             );
         }
 
-        // An empty student number is stored as NULL.
         $studentNo = $studentNo === '' ? null : $studentNo;
 
         if ($studentNo !== null) {
@@ -80,12 +79,13 @@ class AuthController extends Controller
             );
         }
 
-        // Public registration always creates a student account.
-        // Never accept role or status from the request body.
+        // Public registration always creates a student.
+        // Never accept role or dept_id from registration input.
         $this->db->raw(
             'INSERT INTO users
-                (student_no, full_name, email, password_hash, role, status)
-             VALUES (?, ?, ?, ?, ?, ?)',
+                (student_no, full_name, email, password_hash, role,
+                 dept_id, status)
+             VALUES (?, ?, ?, ?, ?, NULL, ?)',
             [
                 $studentNo,
                 $fullName,
@@ -97,8 +97,8 @@ class AuthController extends Controller
         );
 
         $user = $this->db->raw(
-            'SELECT user_id, student_no, full_name, email, role, status,
-                    section_id, yr_id, created_at
+            'SELECT user_id, student_no, full_name, email, role,
+                    dept_id, status, section_id, yr_id, created_at
              FROM users
              WHERE email = ?
              LIMIT 1',
@@ -112,15 +112,15 @@ class AuthController extends Controller
             );
         }
 
-        $this->api->respond([
-            'message' => 'Registration successful.',
-            'user' => $user
-        ], 201);
+        $this->api->respond(
+            [
+                'message' => 'Registration successful.',
+                'user' => $user
+            ],
+            201
+        );
     }
 
-    /**
-     * POST /api/auth/login
-     */
     public function login()
     {
         $this->api->require_method('POST');
@@ -128,8 +128,9 @@ class AuthController extends Controller
 
         $input = $this->api->body();
 
-        $email    = strtolower(trim((string) ($input['email'] ?? '')));
+        $email = strtolower(trim((string) ($input['email'] ?? '')));
         $password = (string) ($input['password'] ?? '');
+        $departmentId = $input['dept_id'] ?? null;
 
         if ($email === '' || $password === '') {
             $this->api->respond_error(
@@ -140,14 +141,17 @@ class AuthController extends Controller
 
         $user = $this->db->raw(
             'SELECT user_id, student_no, full_name, email, password_hash,
-                    role, status, section_id, yr_id, created_at
+                    role, dept_id, status, section_id, yr_id, created_at
              FROM users
              WHERE email = ?
              LIMIT 1',
             [$email]
         )->fetch(PDO::FETCH_ASSOC);
 
-        if (!$user || !password_verify($password, $user['password_hash'])) {
+        if (
+            !$user ||
+            !password_verify($password, $user['password_hash'])
+        ) {
             $this->api->respond_error(
                 'Invalid email or password.',
                 401
@@ -161,10 +165,67 @@ class AuthController extends Controller
             );
         }
 
-        // Use user_id as the JWT subject, not the default "id" column.
+        if ($user['role'] === 'student') {
+            if (
+                $departmentId === null ||
+                !is_scalar($departmentId) ||
+                !ctype_digit((string) $departmentId) ||
+                (int) $departmentId < 1
+            ) {
+                $this->api->respond_error(
+                    'Please select your department to continue.',
+                    422
+                );
+            }
+
+            $department = $this->db->raw(
+                'SELECT dept_id, dept_name
+                 FROM departments
+                 WHERE dept_id = ?
+                 LIMIT 1',
+                [(int) $departmentId]
+            )->fetch(PDO::FETCH_ASSOC);
+
+            if (!$department) {
+                $this->api->respond_error(
+                    'Please select a valid department.',
+                    422
+                );
+            }
+
+            $this->db->raw(
+                'UPDATE users
+                 SET dept_id = ?
+                 WHERE user_id = ? AND role = ?',
+                [
+                    (int) $department['dept_id'],
+                    (int) $user['user_id'],
+                    'student'
+                ]
+            );
+
+            $user['dept_id'] = (int) $department['dept_id'];
+            $user['dept_name'] = $department['dept_name'];
+        } else {
+            $department = $user['dept_id'] === null
+                ? null
+                : $this->db->raw(
+                    'SELECT dept_name
+                     FROM departments
+                     WHERE dept_id = ?
+                     LIMIT 1',
+                    [(int) $user['dept_id']]
+                )->fetch(PDO::FETCH_ASSOC);
+
+            $user['dept_name'] = $department['dept_name'] ?? null;
+        }
+
         $accessToken = $this->api->encode_jwt([
-            'sub'  => (string) $user['user_id'],
-            'role' => $user['role']
+            'sub' => (string) $user['user_id'],
+            'role' => $user['role'],
+            'dept_id' => $user['dept_id'] === null
+                ? null
+                : (int) $user['dept_id']
         ]);
 
         unset($user['password_hash']);
@@ -178,26 +239,48 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * GET /api/auth/me
-     */
+    public function departments()
+    {
+        $this->api->require_method('GET');
+
+        $departments = $this->db->raw(
+            'SELECT dept_id, dept_name
+             FROM departments
+             ORDER BY dept_name ASC'
+        )->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($departments as &$department) {
+            $department['dept_id'] = (int) $department['dept_id'];
+        }
+        unset($department);
+
+        $this->api->respond([
+            'success' => true,
+            'data' => $departments
+        ]);
+    }
+
     public function me()
     {
         $this->api->require_method('GET');
 
-        // Validates the JWT signature and standard claims.
         $auth = $this->api->require_jwt();
-
         $userId = $auth['sub'] ?? null;
 
-        if ($userId === null || !ctype_digit((string) $userId)) {
-            $this->api->respond_error('Invalid token subject.', 401);
+        if (
+            $userId === null ||
+            !ctype_digit((string) $userId)
+        ) {
+            $this->api->respond_error(
+                'Invalid token subject.',
+                401
+            );
         }
 
-        // Manually verify the user because the PK is user_id.
+        // Read the current role and department assignment from the database.
         $user = $this->db->raw(
-            'SELECT user_id, student_no, full_name, email, role, status,
-                    section_id, yr_id, created_at
+            'SELECT user_id, student_no, full_name, email, role,
+                    dept_id, status, section_id, yr_id, created_at
              FROM users
              WHERE user_id = ?
              LIMIT 1',
@@ -211,9 +294,6 @@ class AuthController extends Controller
             );
         }
 
-        // Use the current database role, not just the token role.
-        $this->api->respond([
-            'user' => $user
-        ]);
+        $this->api->respond(['user' => $user]);
     }
 }

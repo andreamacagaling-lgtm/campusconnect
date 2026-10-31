@@ -397,15 +397,18 @@ $config['security_headers'] = [
     'coop'               => 'same-origin',
 
     // ── API ──
-    'api_max_body' => 1048576,
     'cors' => [
         'allowed_origins' => [
-    'https://api-tester.marasigan.dev'
-    ],
-        'credentials'     => false,
-        'methods'         => 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-        'headers'         => 'Authorization, Content-Type, X-Requested-With',
-        'max_age'         => 600,
+            'http://localhost:5173',
+            'http://localhost:5174',
+            'http://127.0.0.1:5173',
+            'http://127.0.0.1:5174',
+            'https://api-tester.marasigan.dev',
+        ],
+        'credentials' => false,
+        'methods' => 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+        'headers' => 'Authorization, Content-Type, X-Requested-With, Accept',
+        'max_age' => 600,
     ],
 ];
 ?>
