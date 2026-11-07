@@ -185,11 +185,11 @@ $config['base_url'] = 'http://localhost:3000/';
 
 ### Vercel frontend routing
 
-The frontend's `vercel.json` sends `/api/*` requests to the deployed Render
-backend and rewrites other paths to `index.html`, so React routes such as
-`/login` work when opened directly. Update the API rewrite destination if the
-backend hostname changes. Deploy the backend and frontend changes for the
-updated routing and API response handling to take effect.
+The frontend's `vercel.json` sends `/api/*` requests and `/uploads/*` event
+images to the deployed Render backend and rewrites other paths to `index.html`,
+so React routes such as `/login` work when opened directly. Update both
+rewrites if the backend hostname changes. Deploy the frontend changes for the
+updated routing to take effect.
 
 ### Google Calendar
 
@@ -282,8 +282,9 @@ they can still view their department's organizations when associating events.
 
 ### USG event announcement notifications
 
-Before enabling this feature, apply migrations `020_add_event_link_to_announcements`
-and `021_add_event_start_email_deliveries` through the deployment's normal
+Before enabling this feature, apply migrations `020_add_event_link_to_announcements`,
+`021_add_event_start_email_deliveries`, `026_add_google_id_to_users`, and
+`027_add_department_scope_to_announcements` through the deployment's normal
 migration process. If that process applies every pending migration, check the
 pending migrations first and run only those intended for the target database.
 
@@ -295,19 +296,26 @@ appears in the student portal. Registered students receive a reminder when
 their event starts. Announcements without an event link do not send event
 emails.
 
-Each new announcement is also emailed to active users with a registered email
-address. This includes existing accounts that have not yet linked a Google ID.
-Configure `MAIL_USERNAME` and `MAIL_PASSWORD` in the backend `.env` with a Gmail
-account and its app password. Keep these credentials out of source control.
-The announcement remains published if email delivery fails; the API reports
-the delivery result.
+USG announcements are visible to all students. Department announcements are
+visible only to students in that department. Both use the same email delivery
+flow and notify active student accounts with registered email addresses;
+department announcements are scoped to students in that department.
+Department admins can publish from the Announcements item in their department
+dashboard. The phone and desktop announcement forms use the same
+server-side email delivery flow. Configure `MAIL_USERNAME` and `MAIL_PASSWORD`
+in the deployed backend environment with a Gmail account and its app password.
+Keep these credentials out of source control. The announcement remains
+published if email delivery fails; the API reports the delivery result to the
+admin.
 
-Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
-`SMTP_ENCRYPTION` (`tls` for port 587 or `ssl` for port 465),
-`SMTP_FROM_EMAIL`, and optionally `SMTP_FROM_NAME` in the backend `.env`.
-Set `STUDENT_PORTAL_URL` to the frontend's Events page URL. Use an SMTP
-credential created for the app, keep it out of source control, and ensure the
-sender address is authorized by the mail provider.
+Event-specific announcement and event-start emails use the same `MAIL_USERNAME`
+and `MAIL_PASSWORD` by default, with Gmail SMTP, port 587, and the sender set
+to `MAIL_USERNAME`. Optional `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
+`SMTP_PASSWORD`, `SMTP_ENCRYPTION` (`tls` for port 587 or `ssl` for port 465),
+`SMTP_FROM_EMAIL`, and `SMTP_FROM_NAME` settings can override those defaults.
+Set `STUDENT_PORTAL_URL` to the frontend's Events page URL to include a direct
+event link in those emails. Keep credentials out of source control and ensure
+the sender address is authorized by the mail provider.
 
 Schedule `php lava events:send-start-reminders` to run every minute. On
 Windows, create a Task Scheduler task that runs `php.exe` with

@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useLocation, useNavigate } from "react-router-dom";
 import EventImageUpload from "./EventImageUpload";
+import { confirmLogout } from "../../authSession";
+import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
 import "./BTVTEDAdmin.css";
 
 const API_BASE_URL =
@@ -110,7 +112,11 @@ function AdminSidebar({
   activeSection,
   fullNavigation,
 }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const logout = () => {
+    if (!confirmLogout()) return;
+
     localStorage.removeItem("campusconnect_token");
     localStorage.removeItem("campusconnect_user");
     sessionStorage.removeItem("campusconnect_token");
@@ -119,18 +125,31 @@ function AdminSidebar({
   };
 
   return (
-    <aside className="btvted-sidebar">
-      <div className="btvted-brand">
+    <aside
+      className={`btvted-sidebar responsive-sidebar ${
+        mobileMenuOpen ? "responsive-sidebar-open" : ""
+      }`}
+    >
+      <div className="btvted-brand responsive-sidebar-brand">
         <img className="btvted-brand-icon" src="/images/msu-seal.png" alt="" />
         <div>
           <strong>CampusConnect</strong>
           <span>{departmentCode} ADMIN PORTAL</span>
         </div>
+        <ResponsiveSidebarToggle
+          isOpen={mobileMenuOpen}
+          onClick={() => setMobileMenuOpen((open) => !open)}
+        />
       </div>
 
-      <div className="btvted-menu-label">{departmentCode} MANAGEMENT</div>
+      <div className="btvted-menu-label responsive-sidebar-label">
+        {departmentCode} MANAGEMENT
+      </div>
 
-      <nav className="btvted-nav">
+      <nav
+        className="btvted-nav responsive-sidebar-nav"
+        onClick={() => setMobileMenuOpen(false)}
+      >
         <button
           type="button"
           className={`btvted-nav-link ${activeSection === "dashboard" ? "active" : ""}`}
@@ -151,6 +170,14 @@ function AdminSidebar({
 
         {fullNavigation && (
           <>
+            <button
+              type="button"
+              className="btvted-nav-link"
+              onClick={() => navigate(`${route}/announcements`)}
+            >
+              <span>▤</span>
+              Announcements
+            </button>
             <button
               type="button"
               className={`btvted-nav-link ${activeSection === "attendance" ? "active" : ""}`}
@@ -179,7 +206,7 @@ function AdminSidebar({
         )}
       </nav>
 
-      <div className="btvted-sidebar-bottom">
+      <div className="btvted-sidebar-bottom responsive-sidebar-bottom">
         <div className="btvted-account">
           <div className="btvted-avatar">{departmentCode}</div>
           <div className="btvted-account-info">

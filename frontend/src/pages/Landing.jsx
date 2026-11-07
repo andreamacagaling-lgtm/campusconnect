@@ -17,7 +17,7 @@ export default function Landing() {
       </header>
 
       <section className="landing-content">
-        <h1>Your campus, connected.</h1>
+        <h1>Connect. Engage. Experience.</h1>
         <p>
           Discover university events, connect with student organizations,
           <br className="landing-description-break" /> and stay in the loop with

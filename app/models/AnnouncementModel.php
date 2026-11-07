@@ -14,7 +14,8 @@ class AnnouncementModel extends Model
         'title',
         'body',
         'posted_by',
-        'event_id'
+        'event_id',
+        'dept_id'
     ];
 
     protected $guarded = [

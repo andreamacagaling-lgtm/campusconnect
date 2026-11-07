@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { confirmLogout } from "../../authSession";
+import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
 import "./Announcements.css";
 
 const API_BASE_URL =
@@ -22,6 +24,15 @@ const NAV_ITEMS = [
     { label: "Attendance", path: "/admin/attendance", icon: "✓" },
     { label: "Admin Profile", path: "/admin/adminprofile", icon: "◎" },
 ];
+
+const DEPARTMENT_ADMIN_ROUTES = {
+    1: "/admin/ccs",
+    2: "/admin/ccje",
+    3: "/admin/cbm",
+    4: "/admin/cas",
+    5: "/admin/btvted",
+    6: "/admin/bsed",
+};
 
 function getToken() {
     return (
@@ -72,15 +83,28 @@ function formatDateTime(value) {
     });
 }
 
-function AdminSidebar({ activePage }) {
+function AdminSidebar({ activePage, user }) {
     const navigate = useNavigate();
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const departmentRoute =
+        DEPARTMENT_ADMIN_ROUTES[Number(user?.dept_id)];
+    const isDepartmentAdmin =
+        user?.role === "admin" &&
+        user?.admin_type === "department" &&
+        Boolean(departmentRoute);
+    const navItems = isDepartmentAdmin
+        ? [
+              { label: "Dashboard", path: departmentRoute, icon: "⌂" },
+              { label: "Events", path: `${departmentRoute}/events`, icon: "▦" },
+              { label: "Announcements", path: `${departmentRoute}/announcements`, icon: "▤" },
+              { label: "Attendance", path: `${departmentRoute}/attendance`, icon: "✓" },
+              { label: "QR Scanner", path: "/admin/scanner", icon: "▣" },
+              { label: "Admin Profile", path: `${departmentRoute}/profile`, icon: "◎" },
+          ]
+        : NAV_ITEMS;
 
     function handleLogout() {
-        const confirmed = window.confirm(
-            "Are you sure you want to log out?"
-        );
-
-        if (!confirmed) return;
+        if (!confirmLogout()) return;
 
         localStorage.removeItem("campusconnect_token");
         sessionStorage.removeItem("campusconnect_token");
@@ -93,19 +117,30 @@ function AdminSidebar({ activePage }) {
     }
 
     return (
-        <aside className="admin-sidebar">
-            <div className="admin-brand">
+        <aside
+            className={`admin-sidebar responsive-sidebar ${
+                mobileMenuOpen ? "responsive-sidebar-open" : ""
+            }`}
+        >
+            <div className="admin-brand responsive-sidebar-brand">
                 <img className="admin-brand-logo" src="/images/msu-seal.png" alt="" />
                 <div>
                     <h2>CampusConnect</h2>
                     <span>ADMIN PORTAL</span>
                 </div>
+                <ResponsiveSidebarToggle
+                    isOpen={mobileMenuOpen}
+                    onClick={() => setMobileMenuOpen((open) => !open)}
+                />
             </div>
 
-            <div className="admin-nav-heading">MAIN MENU</div>
+            <div className="admin-nav-heading responsive-sidebar-label">MAIN MENU</div>
 
-            <nav className="admin-nav">
-                {NAV_ITEMS.map((item) => (
+            <nav
+                className="admin-nav responsive-sidebar-nav"
+                onClick={() => setMobileMenuOpen(false)}
+            >
+                {navItems.map((item) => (
                     <button
                         key={item.path}
                         type="button"
@@ -120,7 +155,7 @@ function AdminSidebar({ activePage }) {
                 ))}
             </nav>
 
-            <div className="admin-sidebar-bottom">
+            <div className="admin-sidebar-bottom responsive-sidebar-bottom">
                 <div className="admin-sidebar-note">
                     <span className="admin-online-dot" />
                     <div>
@@ -147,6 +182,17 @@ export default function Announcements() {
     const user = getUser();
     const adminType = user?.admin_type;
     const adminDeptId = user?.dept_id;
+    const isDepartmentAdmin =
+        user?.role === "admin" &&
+        adminType === "department" &&
+        Boolean(DEPARTMENT_ADMIN_ROUTES[Number(adminDeptId)]);
+    const departmentName = user?.dept_name || "Department";
+    const pageTitle = isDepartmentAdmin
+        ? `${departmentName} Announcements`
+        : "Announcement Management";
+    const pageDescription = isDepartmentAdmin
+        ? `Send announcements to active student email accounts in ${departmentName}.`
+        : "Share important updates and notices with university students.";
     const canNotifyForEvents =
         user?.role === "admin" &&
         ["usg", "department"].includes(adminType);
@@ -391,9 +437,30 @@ export default function Announcements() {
 
             await fetchAnnouncements();
 
-            if (response.data?.email_notification?.success === false) {
+            const notifications = [
+                response.data?.event_email_notification,
+                response.data?.email_notification,
+            ].filter(Boolean);
+            const failedNotifications = notifications.filter(
+                (notification) => notification.success === false
+            );
+
+            if (failedNotifications.length > 0) {
+                const notificationMessages = [
+                    ...new Set(
+                        failedNotifications
+                            .map((notification) => notification.message)
+                            .filter(Boolean)
+                    ),
+                ];
                 setError(
-                    `${response.data.message} ${response.data.email_notification.message}`
+                    notificationMessages.join(" ") ||
+                        response.data?.message ||
+                        "Announcement published, but email notifications could not be sent."
+                );
+            } else if (!response.data?.email_notification) {
+                setError(
+                    "Announcement published, but the server did not confirm email delivery. Check the deployed backend and SMTP settings."
                 );
             } else {
                 setSuccess(
@@ -487,25 +554,38 @@ export default function Announcements() {
 
     return (
         <div className="admin-layout">
-            <AdminSidebar activePage="Announcements" />
+            <AdminSidebar activePage="Announcements" user={user} />
 
             <main className="admin-main">
                 <header className="admin-topbar">
                     <div>
                         <span className="admin-breadcrumb">
-                            Admin / Announcements
+                            {isDepartmentAdmin
+                                ? `${departmentName} Admin / Announcements`
+                                : "Admin / Announcements"}
                         </span>
-                        <h1>Announcement Management</h1>
-                        <p>
-                            Share important updates and notices with university students.
-                        </p>
+                        <h1>{pageTitle}</h1>
+                        <p>{pageDescription}</p>
                     </div>
 
                     <div className="admin-user-chip">
-                        <span className="admin-user-avatar">A</span>
+                        <span className="admin-user-avatar">
+                            {(user?.full_name || departmentName || "A")
+                                .charAt(0)
+                                .toUpperCase()}
+                        </span>
                         <div>
-                            <strong>Administrator</strong>
-                            <small>System Admin</small>
+                            <strong>
+                                {user?.full_name ||
+                                    (isDepartmentAdmin
+                                        ? `${departmentName} Admin`
+                                        : "Administrator")}
+                            </strong>
+                            <small>
+                                {isDepartmentAdmin
+                                    ? "Department Administrator"
+                                    : "System Admin"}
+                            </small>
                         </div>
                     </div>
                 </header>
@@ -513,9 +593,15 @@ export default function Announcements() {
                 <section className="announcements-content">
                     <div className="announcements-heading">
                         <div>
-                            <h2>All Announcements</h2>
+                            <h2>
+                                {isDepartmentAdmin
+                                    ? `${departmentName} Announcements`
+                                    : "All Announcements"}
+                            </h2>
                             <p>
-                                View, publish, edit, and manage campus notices.
+                                {isDepartmentAdmin
+                                    ? "View and manage announcements for your department."
+                                    : "View, publish, edit, and manage campus notices."}
                             </p>
                         </div>
 

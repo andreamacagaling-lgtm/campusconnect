@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { confirmLogout } from "../../authSession";
+import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
 import "./Organizations.css";
 
 const API_BASE_URL =
@@ -86,6 +88,7 @@ function AdminSidebar({
     onProfile,
 }) {
     const navigate = useNavigate();
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const departmentId = user?.admin_type === "organization"
         ? user?.organization_dept_id
         : user?.dept_id;
@@ -99,6 +102,8 @@ function AdminSidebar({
         : NAV_ITEMS;
 
     function handleLogout() {
+        if (!confirmLogout()) return;
+
         localStorage.removeItem("campusconnect_token");
         sessionStorage.removeItem("campusconnect_token");
         localStorage.removeItem("campusconnect_user");
@@ -107,18 +112,29 @@ function AdminSidebar({
     }
 
     return (
-        <aside className="admin-sidebar">
-            <div className="admin-brand">
+        <aside
+            className={`admin-sidebar responsive-sidebar ${
+                mobileMenuOpen ? "responsive-sidebar-open" : ""
+            }`}
+        >
+            <div className="admin-brand responsive-sidebar-brand">
                 <img className="admin-brand-logo" src="/images/msu-seal.png" alt="" />
                 <div>
                     <h2>CampusConnect</h2>
                     <span>ORGANIZATION ADMIN PORTAL</span>
                 </div>
+                <ResponsiveSidebarToggle
+                    isOpen={mobileMenuOpen}
+                    onClick={() => setMobileMenuOpen((open) => !open)}
+                />
             </div>
 
-            <div className="admin-nav-heading">MAIN MENU</div>
+            <div className="admin-nav-heading responsive-sidebar-label">MAIN MENU</div>
 
-            <nav className="admin-nav">
+            <nav
+                className="admin-nav responsive-sidebar-nav"
+                onClick={() => setMobileMenuOpen(false)}
+            >
                 {navItems.map((item) => (
                     <button
                         key={item.path}
@@ -140,7 +156,7 @@ function AdminSidebar({
                 ))}
             </nav>
 
-            <div className="admin-sidebar-bottom">
+            <div className="admin-sidebar-bottom responsive-sidebar-bottom">
                 <div className="admin-sidebar-note">
                     <span className="org-sidebar-avatar">
                         <span className="admin-online-dot" />

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import api from "../../api";
+import { confirmLogout } from "../../authSession";
+import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
 import "./StudentPortal.css";
 
 const NAV_ITEMS = [
@@ -79,7 +81,11 @@ function StudentAvatar({ profile, className = "" }) {
 }
 
 function StudentSidebar({ section, profile, navigate }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const logout = () => {
+    if (!confirmLogout()) return;
+
     localStorage.removeItem("campusconnect_token");
     localStorage.removeItem("campusconnect_user");
     sessionStorage.removeItem("campusconnect_token");
@@ -88,17 +94,41 @@ function StudentSidebar({ section, profile, navigate }) {
   };
 
   return (
-    <aside className="student-sidebar">
-      <Link to="/students/home" className="student-brand">
-        <img className="student-brand-mark" src="/images/msu-seal.png" alt="" />
-        <span>
-          <strong>CampusConnect</strong>
-          <small>STUDENT PORTAL</small>
-        </span>
-      </Link>
+    <aside
+      className={`student-sidebar responsive-sidebar ${
+        mobileMenuOpen ? "responsive-sidebar-open" : ""
+      }`}
+    >
+      <div className="student-brand-row responsive-sidebar-brand">
+        <Link to="/students/home" className="student-brand">
+          <img className="student-brand-mark" src="/images/msu-seal.png" alt="" />
+          <span>
+            <strong>CampusConnect</strong>
+            <small>STUDENT PORTAL</small>
+          </span>
+        </Link>
+        <button
+          type="button"
+          className="student-mobile-signout"
+          aria-label="Sign out"
+          onClick={logout}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10 17l5-5-5-5M15 12H3m9-7h6a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-6" />
+          </svg>
+        </button>
+        <ResponsiveSidebarToggle
+          isOpen={mobileMenuOpen}
+          onClick={() => setMobileMenuOpen((open) => !open)}
+        />
+      </div>
 
-      <p className="student-nav-label">MENU</p>
-      <nav className="student-nav" aria-label="Student navigation">
+      <p className="student-nav-label responsive-sidebar-label">MENU</p>
+      <nav
+        className="student-nav responsive-sidebar-nav"
+        aria-label="Student navigation"
+        onClick={() => setMobileMenuOpen(false)}
+      >
         {NAV_ITEMS.map((item) => (
           <Link
             className={`student-nav-link ${
@@ -116,7 +146,7 @@ function StudentSidebar({ section, profile, navigate }) {
         ))}
       </nav>
 
-      <div className="student-sidebar-bottom">
+      <div className="student-sidebar-bottom responsive-sidebar-bottom">
         <div className="student-sidebar-profile">
           <StudentAvatar profile={profile} />
           <span className="student-sidebar-name">

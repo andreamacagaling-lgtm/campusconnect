@@ -17,10 +17,10 @@ class EventAnnouncementMailer
     {
         require_once ROOT_DIR . 'vendor/autoload.php';
 
-        $host = trim((string) getenv('SMTP_HOST'));
-        $username = trim((string) getenv('SMTP_USERNAME'));
-        $password = (string) getenv('SMTP_PASSWORD');
-        $fromEmail = trim((string) getenv('SMTP_FROM_EMAIL'));
+        $username = trim((string) (getenv('SMTP_USERNAME') ?: getenv('MAIL_USERNAME')));
+        $password = (string) (getenv('SMTP_PASSWORD') ?: getenv('MAIL_PASSWORD'));
+        $host = trim((string) (getenv('SMTP_HOST') ?: 'smtp.gmail.com'));
+        $fromEmail = trim((string) (getenv('SMTP_FROM_EMAIL') ?: $username));
         $fromName = trim((string) (getenv('SMTP_FROM_NAME') ?: 'CampusConnect'));
         $portalUrl = rtrim(trim((string) getenv('STUDENT_PORTAL_URL')), '/');
         $port = filter_var(
@@ -29,26 +29,30 @@ class EventAnnouncementMailer
             ['options' => ['min_range' => 1, 'max_range' => 65535]]
         );
         $encryption = strtolower(trim((string) (getenv('SMTP_ENCRYPTION') ?: 'tls')));
-        $portalUrlParts = parse_url($portalUrl);
+        $portalUrlParts = $portalUrl === '' ? false : parse_url($portalUrl);
 
         if (
-            $host === '' ||
             $username === '' ||
             $password === '' ||
             !$port ||
             !filter_var($fromEmail, FILTER_VALIDATE_EMAIL) ||
-            !filter_var($portalUrl, FILTER_VALIDATE_URL) ||
-            !is_array($portalUrlParts) ||
-            !in_array(
-                strtolower((string) ($portalUrlParts['scheme'] ?? '')),
-                ['http', 'https'],
-                true
+            (
+                $portalUrl !== '' &&
+                (
+                    !filter_var($portalUrl, FILTER_VALIDATE_URL) ||
+                    !is_array($portalUrlParts) ||
+                    !in_array(
+                        strtolower((string) ($portalUrlParts['scheme'] ?? '')),
+                        ['http', 'https'],
+                        true
+                    ) ||
+                    empty($portalUrlParts['host'])
+                )
             ) ||
-            empty($portalUrlParts['host']) ||
             !in_array($encryption, ['tls', 'ssl'], true)
         ) {
             throw new RuntimeException(
-                'SMTP host, credentials, sender, encryption, port, and student portal URL must be configured.'
+                'Mail credentials, sender, encryption, port, and any configured student portal URL must be valid.'
             );
         }
 
@@ -158,9 +162,11 @@ class EventAnnouncementMailer
         $schedule = $this->escape(
             $this->format_event_date($event['start_datetime'] ?? '')
         );
-        $eventUrl = $this->escape(
-            $portalUrl . '?event_id=' . (int) $event['event_id']
-        );
+        $eventUrl = $portalUrl === ''
+            ? ''
+            : $this->escape(
+                $portalUrl . '?event_id=' . (int) $event['event_id']
+            );
 
         return '<!doctype html><html><body style="margin:0;padding:24px;background:#f4f7f5;font-family:Arial,sans-serif;color:#1d2c24;">' .
             '<div style="max-width:600px;margin:0 auto;padding:24px;border:1px solid #e3ebe4;border-radius:12px;background:#fff;">' .
@@ -173,9 +179,11 @@ class EventAnnouncementMailer
             '<h2 style="margin:0 0 8px;font-size:18px;">' . $eventTitle . '</h2>' .
             '<p style="margin:0 0 6px;">' . $schedule . '</p>' .
             '<p style="margin:0;">' . $venue . '</p></div>' .
-            '<a href="' . $eventUrl . '" style="display:inline-block;padding:12px 18px;border-radius:7px;background:#216b43;color:#fff;text-decoration:none;font-weight:bold;">' .
-            ($isEventStart ? 'View event details' : 'View event and register') .
-            '</a>' .
+            ($eventUrl === ''
+                ? ''
+                : '<a href="' . $eventUrl . '" style="display:inline-block;padding:12px 18px;border-radius:7px;background:#216b43;color:#fff;text-decoration:none;font-weight:bold;">' .
+                    ($isEventStart ? 'View event details' : 'View event and register') .
+                    '</a>') .
             '</div></body></html>';
     }
 
@@ -190,9 +198,12 @@ class EventAnnouncementMailer
         return $title . "\n\n" . $content . "\n\n" .
             ($event['title'] ?? '') . "\n" .
             $this->format_event_date($event['start_datetime'] ?? '') . "\n" .
-            ($event['venue'] ?? '') . "\n\n" .
-            ($isEventStart ? 'View event details: ' : 'View event and register: ') . $portalUrl .
-            '?event_id=' . (int) $event['event_id'];
+            ($event['venue'] ?? '') .
+            ($portalUrl === ''
+                ? ''
+                : "\n\n" .
+                    ($isEventStart ? 'View event details: ' : 'View event and register: ') .
+                    $portalUrl . '?event_id=' . (int) $event['event_id']);
     }
 
     private function format_event_date($value)

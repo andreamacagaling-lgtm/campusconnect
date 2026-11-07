@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useLocation, useNavigate } from "react-router-dom";
 import EventImageUpload from "./EventImageUpload";
+import { confirmLogout } from "../../authSession";
+import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
 import "./CBMAdmin.css";
 
 const API_BASE_URL =
@@ -110,7 +112,11 @@ function AdminSidebar({
   activeSection,
   fullNavigation,
 }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const logout = () => {
+    if (!confirmLogout()) return;
+
     localStorage.removeItem("campusconnect_token");
     localStorage.removeItem("campusconnect_user");
     sessionStorage.removeItem("campusconnect_token");
@@ -119,18 +125,31 @@ function AdminSidebar({
   };
 
   return (
-    <aside className="cbm-sidebar">
-      <div className="cbm-brand">
+    <aside
+      className={`cbm-sidebar responsive-sidebar ${
+        mobileMenuOpen ? "responsive-sidebar-open" : ""
+      }`}
+    >
+      <div className="cbm-brand responsive-sidebar-brand">
         <img className="cbm-brand-icon" src="/images/msu-seal.png" alt="" />
         <div>
           <strong>CampusConnect</strong>
           <span>{departmentCode} ADMIN PORTAL</span>
         </div>
+        <ResponsiveSidebarToggle
+          isOpen={mobileMenuOpen}
+          onClick={() => setMobileMenuOpen((open) => !open)}
+        />
       </div>
 
-      <div className="cbm-menu-label">{departmentCode} MANAGEMENT</div>
+      <div className="cbm-menu-label responsive-sidebar-label">
+        {departmentCode} MANAGEMENT
+      </div>
 
-      <nav className="cbm-nav">
+      <nav
+        className="cbm-nav responsive-sidebar-nav"
+        onClick={() => setMobileMenuOpen(false)}
+      >
         <button
           type="button"
           className={`cbm-nav-link ${activeSection === "dashboard" ? "active" : ""}`}
@@ -151,6 +170,14 @@ function AdminSidebar({
 
         {fullNavigation && (
           <>
+            <button
+              type="button"
+              className="cbm-nav-link"
+              onClick={() => navigate(`${route}/announcements`)}
+            >
+              <span>▤</span>
+              Announcements
+            </button>
             <button
               type="button"
               className={`cbm-nav-link ${activeSection === "attendance" ? "active" : ""}`}
@@ -179,7 +206,7 @@ function AdminSidebar({
         )}
       </nav>
 
-      <div className="cbm-sidebar-bottom">
+      <div className="cbm-sidebar-bottom responsive-sidebar-bottom">
         <div className="cbm-account">
           <div className="cbm-avatar">{departmentCode}</div>
           <div className="cbm-account-info">

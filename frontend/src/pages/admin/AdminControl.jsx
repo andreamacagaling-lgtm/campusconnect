@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import api from "../../api";
+import { confirmLogout } from "../../authSession";
 import EventImageUpload from "./EventImageUpload";
+import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
 import "./AdminControl.css";
 
 const NAV_ITEMS = [
@@ -299,7 +301,11 @@ function CalendarView({ events }) {
 }
 
 function AdminSidebar({ activePage, user, navigate, onNavigate }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   function logout() {
+    if (!confirmLogout()) return;
+
     localStorage.removeItem("campusconnect_token");
     localStorage.removeItem("campusconnect_user");
     sessionStorage.removeItem("campusconnect_token");
@@ -308,17 +314,29 @@ function AdminSidebar({ activePage, user, navigate, onNavigate }) {
   }
 
   return (
-    <aside className="control-sidebar">
-      <div className="control-brand">
+    <aside
+      className={`control-sidebar responsive-sidebar ${
+        mobileMenuOpen ? "responsive-sidebar-open" : ""
+      }`}
+    >
+      <div className="control-brand responsive-sidebar-brand">
         <img className="control-brand-mark" src="/images/msu-seal.png" alt="" />
         <span>
           <strong>CampusConnect</strong>
           <small>UNIVERSITY STUDENT ADMIN</small>
         </span>
+        <ResponsiveSidebarToggle
+          isOpen={mobileMenuOpen}
+          onClick={() => setMobileMenuOpen((open) => !open)}
+        />
       </div>
 
-      <p className="control-nav-label">FULL CONTROL</p>
-      <nav className="control-nav" aria-label="Admin navigation">
+      <p className="control-nav-label responsive-sidebar-label">FULL CONTROL</p>
+      <nav
+        className="control-nav responsive-sidebar-nav"
+        aria-label="Admin navigation"
+        onClick={() => setMobileMenuOpen(false)}
+      >
         {NAV_ITEMS.map((item) => (
           <button
             type="button"
@@ -332,7 +350,7 @@ function AdminSidebar({ activePage, user, navigate, onNavigate }) {
         ))}
       </nav>
 
-      <div className="control-sidebar-bottom">
+      <div className="control-sidebar-bottom responsive-sidebar-bottom">
         <div className="control-account">
           <span className="control-avatar">
             {(user?.full_name || "A").charAt(0).toUpperCase()}

@@ -16,6 +16,10 @@ export function persistAuthSession(data, rememberMe = false) {
   return true;
 }
 
+export function confirmLogout() {
+  return window.confirm("Are you sure you want to log out?");
+}
+
 export function getAuthDestination(user) {
   if (user?.admin_type === "osse") return "/admin/osse/events";
   if (user?.admin_type === "organization") {

@@ -185,7 +185,7 @@ export default function Login() {
             className="auth-submit"
             disabled={loading || googleLoading}
           >
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? "Logging in..." : "Log in"}
             {!loading && <span aria-hidden="true">→</span>}
           </button>
         </form>

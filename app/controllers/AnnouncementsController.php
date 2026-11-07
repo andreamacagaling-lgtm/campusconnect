@@ -20,6 +20,15 @@ class AnnouncementsController extends Controller
         $this->api->require_method('GET');
 
         try {
+            $claims = $this->api->require_jwt();
+            $viewer = $this->get_announcement_viewer($claims);
+
+            if ($viewer === null) {
+                return;
+            }
+
+            [$scopeSql, $scopeParams] = $this->announcement_view_scope($viewer);
+
             if ($id !== null) {
                 if (!$this->valid_id($id)) {
                     $this->api->respond_error(
@@ -29,7 +38,18 @@ class AnnouncementsController extends Controller
                     return;
                 }
 
-                $announcement = $this->announcements->find((int) $id);
+                $announcement = $this->db->raw(
+                    'SELECT a.*, e.title AS event_title,
+                            e.start_datetime AS event_start_datetime,
+                            e.end_datetime AS event_end_datetime,
+                            e.venue AS event_venue,
+                            e.image AS event_image
+                     FROM announcements a
+                     LEFT JOIN events e ON e.event_id = a.event_id
+                     WHERE a.announcement_id = ? AND ' . $scopeSql . '
+                     LIMIT 1',
+                    array_merge([(int) $id], $scopeParams)
+                )->fetch(PDO::FETCH_ASSOC);
 
                 if (!$announcement) {
                     $this->api->respond_error(
@@ -55,7 +75,9 @@ class AnnouncementsController extends Controller
                         e.image AS event_image
                  FROM announcements a
                  LEFT JOIN events e ON e.event_id = a.event_id
-                 ORDER BY a.created_at DESC'
+                 WHERE ' . $scopeSql . '
+                 ORDER BY a.created_at DESC',
+                $scopeParams
             )->fetchAll(PDO::FETCH_ASSOC);
 
             $this->api->respond([
@@ -176,7 +198,10 @@ class AnnouncementsController extends Controller
             'title' => $title,
             'body' => $content,
             'posted_by' => (int) $user['sub'],
-            'event_id' => $eventId
+            'event_id' => $eventId,
+            'dept_id' => $user['admin_type'] === 'department'
+                ? (int) $user['dept_id']
+                : null
         ];
 
         try {
@@ -208,6 +233,7 @@ class AnnouncementsController extends Controller
                 $announcementId,
                 $title,
                 $content,
+                $data['dept_id'],
                 $eventEmailNotification['sent_emails'] ?? []
             );
 
@@ -222,14 +248,14 @@ class AnnouncementsController extends Controller
             if ($emailNotification['success'] && $emailNotification['sent'] > 0) {
                 $message = 'Announcement published and emailed to ' .
                     $emailNotification['sent'] .
-                    ' registered account(s).';
+                    ' active student email account(s).';
             } elseif ($emailNotification['success']) {
-                $message = 'Announcement published; registered account emails already received the event notification.';
+                $message = 'Announcement published; active student email accounts already received the event notification.';
             } elseif ($emailNotification['failed'] === 0) {
-                $message = 'Announcement published, but no active registered account emails were found to notify.';
+                $message = 'Announcement published, but no active student email accounts were found in the target audience.';
             } elseif ($emailNotification['sent'] > 0) {
                 $message = 'Announcement published; email was sent to ' .
-                    $emailNotification['sent'] . ' Google account(s), but ' .
+                    $emailNotification['sent'] . ' active student email account(s), but ' .
                     $emailNotification['failed'] . ' notification(s) failed.';
             } else {
                 $message = 'Announcement published, but Google account email notifications could not be sent.';
@@ -279,6 +305,14 @@ class AnnouncementsController extends Controller
             $this->api->respond_error(
                 'Announcement not found.',
                 404
+            );
+            return;
+        }
+
+        if (!$this->can_manage_announcement($user, $existing)) {
+            $this->api->respond_error(
+                'You can only manage announcements for your account scope.',
+                403
             );
             return;
         }
@@ -370,6 +404,14 @@ class AnnouncementsController extends Controller
             return;
         }
 
+        if (!$this->can_manage_announcement($user, $existing)) {
+            $this->api->respond_error(
+                'You can only manage announcements for your account scope.',
+                403
+            );
+            return;
+        }
+
         try {
             $deleted = $this->announcements->delete((int) $id);
 
@@ -400,12 +442,33 @@ class AnnouncementsController extends Controller
 
     private function require_admin()
     {
-        $user = $this->api->require_jwt();
+        $claims = $this->api->require_jwt();
+        if (!is_array($claims) || !$this->valid_id($claims['sub'] ?? null)) {
+            $this->api->respond_error('Invalid authentication token.', 401);
+            return null;
+        }
+
+        $user = $this->db->raw(
+            'SELECT user_id, role, admin_type, dept_id, status
+             FROM users
+             WHERE user_id = ?
+             LIMIT 1',
+            [(int) $claims['sub']]
+        )->fetch(PDO::FETCH_ASSOC);
 
         if (
             !is_array($user) ||
-            !isset($user['sub'], $user['role']) ||
-            $user['role'] !== 'admin'
+            $user['role'] !== 'admin' ||
+            $user['status'] !== 'active' ||
+            !in_array($user['admin_type'], ['usg', 'department'], true) ||
+            (
+                $user['admin_type'] === 'usg' &&
+                $user['dept_id'] !== null
+            ) ||
+            (
+                $user['admin_type'] === 'department' &&
+                (int) $user['dept_id'] < 1
+            )
         ) {
             $this->api->respond_error(
                 'Admin access required.',
@@ -415,7 +478,104 @@ class AnnouncementsController extends Controller
             return null;
         }
 
+        $user['sub'] = (int) $user['user_id'];
+        $user['dept_id'] = $user['dept_id'] === null
+            ? null
+            : (int) $user['dept_id'];
+
         return $user;
+    }
+
+    private function get_announcement_viewer($claims)
+    {
+        if (!is_array($claims) || !$this->valid_id($claims['sub'] ?? null)) {
+            $this->api->respond_error('Invalid authentication token.', 401);
+            return null;
+        }
+
+        $viewer = $this->db->raw(
+            'SELECT u.user_id, u.role, u.admin_type, u.dept_id, u.status,
+                    COALESCE(u.dept_id, s.dept_id) AS student_dept_id
+             FROM users u
+             LEFT JOIN sections s ON s.section_id = u.section_id
+             WHERE u.user_id = ?
+             LIMIT 1',
+            [(int) $claims['sub']]
+        )->fetch(PDO::FETCH_ASSOC);
+
+        if (!$viewer) {
+            $this->api->respond_error('User account not found.', 401);
+            return null;
+        }
+
+        if (
+            $viewer['status'] !== 'active'
+        ) {
+            $this->api->respond_error('Active account required.', 403);
+            return null;
+        }
+
+        if (
+            $viewer['role'] === 'admin' &&
+            in_array($viewer['admin_type'], ['usg', 'department'], true)
+        ) {
+            if (
+                ($viewer['admin_type'] === 'usg' && $viewer['dept_id'] !== null) ||
+                (
+                    $viewer['admin_type'] === 'department' &&
+                    (int) $viewer['dept_id'] < 1
+                )
+            ) {
+                $this->api->respond_error('Admin department scope is invalid.', 403);
+                return null;
+            }
+
+            $viewer['dept_id'] = $viewer['dept_id'] === null
+                ? null
+                : (int) $viewer['dept_id'];
+            return $viewer;
+        }
+
+        if ($viewer['role'] === 'student') {
+            $viewer['dept_id'] = $viewer['student_dept_id'] === null
+                ? null
+                : (int) $viewer['student_dept_id'];
+            return $viewer;
+        }
+
+        $this->api->respond_error('Announcement access required.', 403);
+        return null;
+    }
+
+    private function announcement_view_scope(array $viewer)
+    {
+        if ($viewer['role'] === 'student') {
+            return $viewer['dept_id'] === null
+                ? ['a.dept_id IS NULL', []]
+                : [
+                    '(a.dept_id IS NULL OR a.dept_id = ?)',
+                    [$viewer['dept_id']]
+                ];
+        }
+
+        if ($viewer['admin_type'] === 'usg') {
+            return ['a.dept_id IS NULL', []];
+        }
+
+        return ['a.dept_id = ?', [$viewer['dept_id']]];
+    }
+
+    private function can_manage_announcement(array $user, array $announcement)
+    {
+        $announcementDeptId = $announcement['dept_id'] === null
+            ? null
+            : (int) $announcement['dept_id'];
+
+        if ($user['admin_type'] === 'usg') {
+            return $announcementDeptId === null;
+        }
+
+        return $announcementDeptId === (int) $user['dept_id'];
     }
 
     private function validate_announcement($title, $content)
@@ -541,18 +701,38 @@ class AnnouncementsController extends Controller
         $announcementId,
         $title,
         $content,
+        $departmentId,
         array $alreadyNotified = []
     ) {
         try {
             $recipients = $this->db->raw(
-                'SELECT DISTINCT email
-                 FROM users
-                 WHERE status = ?
-                   AND email IS NOT NULL
-                   AND TRIM(email) <> ?
-                 ORDER BY email ASC',
-                ['active', '']
+                'SELECT DISTINCT u.email
+                 FROM users u
+                 LEFT JOIN sections s ON s.section_id = u.section_id
+                 WHERE u.role = ?
+                   AND u.status = ?
+                   AND u.email IS NOT NULL
+                   AND TRIM(u.email) <> ?' .
+                    ($departmentId === null
+                        ? ''
+                        : ' AND COALESCE(u.dept_id, s.dept_id) = ?') .
+                    ' ORDER BY u.email ASC',
+                array_values(array_merge(
+                    ['student', 'active', ''],
+                    $departmentId === null
+                        ? []
+                        : [(int) $departmentId]
+                ))
             )->fetchAll(PDO::FETCH_COLUMN);
+
+            if (!$recipients) {
+                return [
+                    'success' => false,
+                    'sent' => 0,
+                    'failed' => 0,
+                    'message' => 'No active student email accounts were found in the target audience.'
+                ];
+            }
 
             require_once APP_DIR . 'services/EmailService.php';
             $delivery = EmailService::sendEmails(

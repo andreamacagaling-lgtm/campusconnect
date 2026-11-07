@@ -77,6 +77,30 @@ function App() {
           path="/adminOrg/orgF"
           element={<OrganizationDepartmentF />}
         />
+        <Route
+          path="/admin/ccs/announcements"
+          element={<Announcements />}
+        />
+        <Route
+          path="/admin/ccje/announcements"
+          element={<Announcements />}
+        />
+        <Route
+          path="/admin/cbm/announcements"
+          element={<Announcements />}
+        />
+        <Route
+          path="/admin/cas/announcements"
+          element={<Announcements />}
+        />
+        <Route
+          path="/admin/btvted/announcements"
+          element={<Announcements />}
+        />
+        <Route
+          path="/admin/bsed/announcements"
+          element={<Announcements />}
+        />
         <Route path="/admin/ccs/*" element={<CCSAdmin />} />
         <Route
           path="/admin/ccs-events"

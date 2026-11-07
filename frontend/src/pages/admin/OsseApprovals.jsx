@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../../api";
+import { confirmLogout } from "../../authSession";
+import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
 import "./OsseApprovals.css";
 
 function getToken() {
@@ -83,6 +85,7 @@ function EventApprovalCard({ event, departmentName, onSelect }) {
 
 export default function OsseApprovals() {
   const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const user = getUser();
   const [events, setEvents] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -196,6 +199,8 @@ export default function OsseApprovals() {
   }
 
   function logout() {
+    if (!confirmLogout()) return;
+
     localStorage.removeItem("campusconnect_token");
     localStorage.removeItem("campusconnect_user");
     sessionStorage.removeItem("campusconnect_token");
@@ -219,17 +224,29 @@ export default function OsseApprovals() {
 
   return (
     <div className="osse-layout">
-      <aside className="osse-sidebar">
-        <div className="osse-brand">
+      <aside
+        className={`osse-sidebar responsive-sidebar ${
+          mobileMenuOpen ? "responsive-sidebar-open" : ""
+        }`}
+      >
+        <div className="osse-brand responsive-sidebar-brand">
           <img className="osse-brand-mark" src="/images/msu-seal.png" alt="" />
           <span>
             <strong>CampusConnect</strong>
             <small>UNIVERSITY ADMIN</small>
           </span>
+          <ResponsiveSidebarToggle
+            isOpen={mobileMenuOpen}
+            onClick={() => setMobileMenuOpen((open) => !open)}
+          />
         </div>
 
-        <p className="osse-nav-label">OSSE WORKSPACE</p>
-        <nav className="osse-nav" aria-label="OSSE navigation">
+        <p className="osse-nav-label responsive-sidebar-label">OSSE WORKSPACE</p>
+        <nav
+          className="osse-nav responsive-sidebar-nav"
+          aria-label="OSSE navigation"
+          onClick={() => setMobileMenuOpen(false)}
+        >
           <Link
             className="osse-nav-link active"
             to="/admin/osse/events"
@@ -240,7 +257,7 @@ export default function OsseApprovals() {
           </Link>
         </nav>
 
-        <div className="osse-sidebar-bottom">
+        <div className="osse-sidebar-bottom responsive-sidebar-bottom">
           <div className="osse-account">
             <span className="osse-avatar">
               {(user?.full_name || "O").charAt(0).toUpperCase()}

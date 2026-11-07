@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useLocation, useNavigate } from "react-router-dom";
 import EventImageUpload from "./EventImageUpload";
+import { confirmLogout } from "../../authSession";
+import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
 import "./CCSAdmin.css";
 
 const API_BASE_URL =
@@ -110,7 +112,11 @@ function AdminSidebar({
   activeSection,
   fullNavigation,
 }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const logout = () => {
+    if (!confirmLogout()) return;
+
     localStorage.removeItem("campusconnect_token");
     localStorage.removeItem("campusconnect_user");
     sessionStorage.removeItem("campusconnect_token");
@@ -119,18 +125,31 @@ function AdminSidebar({
   };
 
   return (
-    <aside className="ccs-admin-sidebar">
-      <div className="ccs-admin-brand">
+    <aside
+      className={`ccs-admin-sidebar responsive-sidebar ${
+        mobileMenuOpen ? "responsive-sidebar-open" : ""
+      }`}
+    >
+      <div className="ccs-admin-brand responsive-sidebar-brand">
         <img className="ccs-admin-brand-icon" src="/images/msu-seal.png" alt="" />
         <div>
           <strong>CampusConnect</strong>
           <span>{departmentCode} ADMIN PORTAL</span>
         </div>
+        <ResponsiveSidebarToggle
+          isOpen={mobileMenuOpen}
+          onClick={() => setMobileMenuOpen((open) => !open)}
+        />
       </div>
 
-      <div className="ccs-admin-menu-label">{departmentCode} MANAGEMENT</div>
+      <div className="ccs-admin-menu-label responsive-sidebar-label">
+        {departmentCode} MANAGEMENT
+      </div>
 
-      <nav className="ccs-admin-nav">
+      <nav
+        className="ccs-admin-nav responsive-sidebar-nav"
+        onClick={() => setMobileMenuOpen(false)}
+      >
         <button
           type="button"
           className={`ccs-admin-nav-link ${activeSection === "dashboard" ? "active" : ""}`}
@@ -151,6 +170,14 @@ function AdminSidebar({
 
         {fullNavigation && (
           <>
+            <button
+              type="button"
+              className="ccs-admin-nav-link"
+              onClick={() => navigate(`${route}/announcements`)}
+            >
+              <span>▤</span>
+              Announcements
+            </button>
             <button
               type="button"
               className={`ccs-admin-nav-link ${activeSection === "attendance" ? "active" : ""}`}
@@ -179,7 +206,7 @@ function AdminSidebar({
         )}
       </nav>
 
-      <div className="ccs-admin-sidebar-bottom">
+      <div className="ccs-admin-sidebar-bottom responsive-sidebar-bottom">
         <div className="ccs-admin-account">
           <div className="ccs-admin-avatar">{departmentCode}</div>
           <div className="ccs-admin-account-info">

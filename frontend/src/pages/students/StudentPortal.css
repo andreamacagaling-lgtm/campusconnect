@@ -24,6 +24,12 @@
   padding: 0 7px 32px;
 }
 
+.student-brand-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .student-brand-mark {
   display: block;
   width: 42px;
@@ -162,6 +168,36 @@
 
 .student-signout:hover {
   background: #244b38;
+}
+
+.student-mobile-signout {
+  display: none;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid #466352;
+  border-radius: 9px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+
+.student-mobile-signout svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.student-mobile-signout:focus-visible {
+  outline: 3px solid #9de0b5;
+  outline-offset: 2px;
 }
 
 .student-main {
@@ -1478,7 +1514,7 @@
   }
 
   .student-brand {
-    padding: 0 4px 13px;
+    padding: 0;
   }
 
   .student-nav-label,
@@ -1505,6 +1541,10 @@
     width: 17px;
     flex-basis: 17px;
     font-size: 15px;
+  }
+
+  .student-mobile-signout {
+    display: inline-flex;
   }
 
   .student-main {
