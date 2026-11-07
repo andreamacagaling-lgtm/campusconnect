@@ -17,7 +17,8 @@ export function persistAuthSession(data, rememberMe = false) {
 }
 
 export function confirmLogout() {
-  return window.confirm("Are you sure you want to log out?");
+  window.dispatchEvent(new Event("campusconnect:logout-request"));
+  return false;
 }
 
 export function getAuthDestination(user) {

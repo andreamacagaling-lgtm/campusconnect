@@ -4,6 +4,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { confirmLogout } from "../../authSession";
 import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
+import { notifySuccess } from "../../notifications";
 import "./Announcements.css";
 
 const API_BASE_URL =
@@ -463,7 +464,7 @@ export default function Announcements() {
                     "Announcement published, but the server did not confirm email delivery. Check the deployed backend and SMTP settings."
                 );
             } else {
-                setSuccess(
+                notifySuccess(
                     response.data?.message ||
                         (editingId !== null
                             ? "Announcement updated successfully."
@@ -500,7 +501,7 @@ export default function Announcements() {
                 { headers: getHeaders() }
             );
 
-            setSuccess("Announcement deleted successfully.");
+            notifySuccess("Announcement deleted successfully.");
             await fetchAnnouncements();
         } catch (err) {
             if (!handleUnauthorized(err)) {

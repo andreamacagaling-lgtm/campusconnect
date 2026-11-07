@@ -279,6 +279,9 @@ and data access. Apply migrations `024_add_organization_admin_type` and
 `025_add_organization_admin_department` before using this feature. Department
 administrators no longer have organization management in their dashboard;
 they can still view their department's organizations when associating events.
+Students receive a Toastify notification in the Student Portal when an
+organization membership request is approved. The portal checks membership
+status while open and remembers already-notified approvals in the browser.
 
 ### USG event announcement notifications
 

@@ -4,6 +4,7 @@ import api from "../../api";
 import { confirmLogout } from "../../authSession";
 import EventImageUpload from "./EventImageUpload";
 import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
+import { notifySuccess } from "../../notifications";
 import "./AdminControl.css";
 
 const NAV_ITEMS = [
@@ -669,7 +670,7 @@ export default function AdminControl() {
         }
       );
 
-      setNotice(
+      notifySuccess(
         response.data?.message || "Campus event submitted to OSSE for approval."
       );
       setEventForm({
@@ -713,7 +714,7 @@ export default function AdminControl() {
         throw new Error("The updated administrator profile was not returned by the server.");
       }
       persistAdminProfile(response.data.user);
-      setProfileNotice(response.data.message || "Profile updated successfully.");
+      notifySuccess(response.data.message || "Profile updated successfully.");
     } catch (requestError) {
       setProfileError(getRequestErrorMessage(requestError));
     } finally {
@@ -745,7 +746,9 @@ export default function AdminControl() {
         throw new Error("The updated profile photo was not returned by the server.");
       }
       persistAdminProfile(response.data.user);
-      setProfileNotice(response.data.message || "Profile photo updated successfully.");
+      notifySuccess(
+        response.data.message || "Profile photo updated successfully."
+      );
     } catch (requestError) {
       setProfileError(getRequestErrorMessage(requestError));
     } finally {

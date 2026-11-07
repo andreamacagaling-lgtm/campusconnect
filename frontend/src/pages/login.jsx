@@ -5,6 +5,7 @@ import api from "../api";
 import { getAuthDestination, persistAuthSession } from "../authSession";
 import AuthLayout from "../components/AuthLayout";
 import GoogleSignInButton from "../components/GoogleSignInButton";
+import { notifySuccess } from "../notifications";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -36,6 +37,7 @@ export default function Login() {
     }
 
     persistAuthSession(data, rememberMe);
+    notifySuccess("Login Successfully");
     navigate(destination, { replace: true });
   };
 
@@ -99,7 +101,7 @@ export default function Login() {
         requestError.response?.data?.error;
 
       if (!requestError.response) {
-        setError("Cannot connect to the server. Please try again.");
+        ("Cannot connect to the server. Please try again.");
       } else if (status === 404) {
         setError("No account is registered with this Google email. Create an account first.");
       } else {

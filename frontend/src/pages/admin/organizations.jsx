@@ -4,6 +4,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { confirmLogout } from "../../authSession";
 import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
+import { notifySuccess } from "../../notifications";
 import "./Organizations.css";
 
 const API_BASE_URL =
@@ -399,7 +400,7 @@ export default function Organizations({ expectedDepartmentId = null } = {}) {
                 { status },
                 { headers: getHeaders() }
             );
-            setSuccess(
+            notifySuccess(
                 response.data?.message ||
                     `Membership application ${status}.`
             );
@@ -444,7 +445,7 @@ export default function Organizations({ expectedDepartmentId = null } = {}) {
                 "campusconnect_user",
                 JSON.stringify(response.data.user)
             );
-            setProfileNotice(response.data.message || "Profile updated successfully.");
+            notifySuccess(response.data.message || "Profile updated successfully.");
         } catch (requestError) {
             if (!handleUnauthorized(requestError)) {
                 setProfileError(
@@ -492,7 +493,7 @@ export default function Organizations({ expectedDepartmentId = null } = {}) {
                 "campusconnect_user",
                 JSON.stringify(response.data.user)
             );
-            setProfileNotice(response.data.message || "Profile photo updated.");
+            notifySuccess(response.data.message || "Profile photo updated.");
         } catch (requestError) {
             if (!handleUnauthorized(requestError)) {
                 setProfileError(
@@ -594,13 +595,13 @@ export default function Organizations({ expectedDepartmentId = null } = {}) {
                     { headers: getHeaders() }
                 );
 
-                setSuccess("Organization updated successfully.");
+                notifySuccess("Organization Updated Successfully");
             } else {
                 await axios.post(ORGANIZATIONS_API, payload, {
                     headers: getHeaders(),
                 });
 
-                setSuccess("Organization added successfully.");
+                notifySuccess("Add Organization Successfully");
             }
 
             setShowModal(false);
@@ -639,7 +640,7 @@ export default function Organizations({ expectedDepartmentId = null } = {}) {
                 { headers: getHeaders() }
             );
 
-            setSuccess("Organization  deleted successfully.");
+            notifySuccess("Organization deleted successfully.");
             await fetchOrganizations();
         } catch (err) {
             if (!handleUnauthorized(err)) {

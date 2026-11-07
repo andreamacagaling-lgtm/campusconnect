@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import EventImageUpload from "./EventImageUpload";
 import { confirmLogout } from "../../authSession";
 import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
+import { notifySuccess } from "../../notifications";
 import "./CCJEAdmin.css";
 
 const API_BASE_URL =
@@ -567,7 +568,7 @@ export default function CCJEAdmin() {
           { headers: getHeaders() }
         );
 
-        setNotice(response.data?.message || "Event updated successfully.");
+        notifySuccess(response.data?.message || "Event updated successfully.");
         if (response.data?.google_calendar_sync?.success === false) {
           calendarSyncWarning =
             response.data.google_calendar_sync.message ||
@@ -594,7 +595,7 @@ export default function CCJEAdmin() {
           }
         );
 
-        setNotice(response.data?.message || "Event created successfully.");
+        notifySuccess(response.data?.message || "Event created successfully.");
         if (response.data?.google_calendar_sync?.success === false) {
           calendarSyncWarning =
             response.data.google_calendar_sync.message ||
@@ -639,7 +640,7 @@ export default function CCJEAdmin() {
         { headers: getHeaders() }
       );
 
-      setNotice(response.data?.message || "Event deleted successfully.");
+      notifySuccess(response.data?.message || "Event deleted successfully.");
       await fetchEvents();
 
       if (response.data?.google_calendar_sync?.success === false) {
@@ -677,7 +678,7 @@ export default function CCJEAdmin() {
 
       await fetchEvents();
 
-      setNotice(
+      notifySuccess(
         `Google Calendar sync complete: ${syncedCount} synced, ${failedCount} failed.`
       );
 

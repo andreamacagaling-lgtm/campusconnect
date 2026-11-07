@@ -1,4 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import Landing from "./pages/Landing";
 import Login from "./pages/login";
 import Register from "./pages/register";
@@ -19,10 +21,21 @@ import OrganizationDepartmentC from "./pages/adminOrg/orgC";
 import OrganizationDepartmentD from "./pages/adminOrg/orgD";
 import OrganizationDepartmentE from "./pages/adminOrg/orgE";
 import OrganizationDepartmentF from "./pages/adminOrg/orgF";
+import SessionControls from "./components/SessionControls";
 
 function App() {
   return (
     <BrowserRouter>
+      <SessionControls />
+      <ToastContainer
+        position="top-center"
+        autoClose={3500}
+        newestOnTop
+        closeOnClick
+        pauseOnFocusLoss
+        draggable
+        theme="light"
+      />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />

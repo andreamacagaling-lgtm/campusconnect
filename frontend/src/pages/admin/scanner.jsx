@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5QrcodeScanner } from "html5-qrcode";
 import { useNavigate } from "react-router-dom";
 import api from "../../api";
+import { notifySuccess } from "../../notifications";
 import "./AdminAttendanceScanner.css";
 
 const DEPARTMENT_DASHBOARDS = {
@@ -129,7 +130,7 @@ export default function AdminAttendanceScanner() {
             }
 
             setScanResult(result);
-            setSuccessMsg(response.data.message || "Attendance recorded.");
+            notifySuccess(response.data.message || "Attendance recorded.");
           } catch (requestError) {
             const result = requestError.response?.data?.data;
             if (result) setScanResult(result);

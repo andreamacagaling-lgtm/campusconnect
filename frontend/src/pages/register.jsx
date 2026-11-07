@@ -5,6 +5,7 @@ import api from "../api";
 import { getAuthDestination, persistAuthSession } from "../authSession";
 import AuthLayout from "../components/AuthLayout";
 import GoogleSignInButton from "../components/GoogleSignInButton";
+import { notifySuccess } from "../notifications";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -21,7 +22,6 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [departments, setDepartments] = useState([]);
@@ -76,8 +76,6 @@ export default function Register() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
-    setSuccess("");
-
     if (
       !form.full_name.trim() ||
       !form.email.trim() ||
@@ -114,7 +112,7 @@ export default function Register() {
 
       await api.post("/auth/register", payload);
 
-      setSuccess("Account created successfully! Redirecting to sign in...");
+      notifySuccess("Register Successfully");
 
       // Registration does not automatically grant an admin role.
       setTimeout(() => {
@@ -145,7 +143,6 @@ export default function Register() {
 
   const submitGoogleCredential = async (credential) => {
     setError("");
-    setSuccess("");
     setGoogleLoading(true);
 
     try {
@@ -207,12 +204,6 @@ export default function Register() {
           <div className="auth-alert" role="alert">
             <span aria-hidden="true">!</span>
             <span>{error}</span>
-          </div>
-        )}
-
-        {success && (
-          <div className="auth-success" role="status">
-            {success}
           </div>
         )}
 

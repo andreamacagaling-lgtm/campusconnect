@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import api from "../../api";
 import { confirmLogout } from "../../authSession";
 import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
+import { notifySuccess } from "../../notifications";
 import "./OsseApprovals.css";
 
 function getToken() {
@@ -176,7 +177,7 @@ export default function OsseApprovals() {
         action === "reject" ? { approval_note: approvalNote.trim() } : {}
       );
       setSelectedEvent(null);
-      setNotice(
+      notifySuccess(
         response.data?.message ||
           (action === "approve" ? "Event approved." : "Event rejected.")
       );

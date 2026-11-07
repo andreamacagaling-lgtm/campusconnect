@@ -4,6 +4,7 @@ import { QRCodeSVG } from "qrcode.react";
 import api from "../../api";
 import { confirmLogout } from "../../authSession";
 import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
+import { notifySuccess } from "../../notifications";
 import "./StudentPortal.css";
 
 const NAV_ITEMS = [
@@ -61,6 +62,46 @@ function getErrorMessage(error, fallback) {
     error?.response?.data?.error ||
     fallback
   );
+}
+
+function notifyMembershipChanges(organizations, profileUserId) {
+  try {
+    const currentUser = JSON.parse(
+      localStorage.getItem("campusconnect_user") ||
+        sessionStorage.getItem("campusconnect_user") ||
+        "null"
+    );
+    const studentId =
+      profileUserId || currentUser?.user_id || currentUser?.sub || "student";
+    const membershipKey = `campusconnect_memberships_${studentId}`;
+    const storedMemberships = JSON.parse(
+      localStorage.getItem(membershipKey) || "{}"
+    );
+    const previousMemberships =
+      storedMemberships && typeof storedMemberships === "object"
+        ? storedMemberships
+        : {};
+    const currentMemberships = { ...previousMemberships };
+
+    for (const organization of organizations) {
+      const status = organization.membership_status;
+      if (!status) continue;
+
+      currentMemberships[organization.org_id] = status;
+      if (
+        status === "approved" &&
+        previousMemberships[organization.org_id] === "pending"
+      ) {
+        notifySuccess(
+          `Your membership in ${organization.org_name} was approved. You are now a member.`
+        );
+      }
+    }
+
+    localStorage.setItem(membershipKey, JSON.stringify(currentMemberships));
+  } catch (storageError) {
+    console.error("Unable to track organization membership updates:", storageError);
+  }
 }
 
 function StudentAvatar({ profile, className = "" }) {
@@ -159,7 +200,7 @@ function StudentSidebar({ section, profile, navigate }) {
           className="student-signout"
           onClick={logout}
         >
-          ↪ Sign out
+          ↪ Log out
         </button>
       </div>
     </aside>
@@ -385,6 +426,11 @@ export default function StudentPortal() {
         throw new Error("The student portal response was incomplete.");
       }
 
+      notifyMembershipChanges(
+        Array.isArray(data.organizations) ? data.organizations : [],
+        data.profile.user_id
+      );
+
       setError("");
       setPortal(data);
       setProfileForm({
@@ -416,9 +462,43 @@ export default function StudentPortal() {
     }
   }, [navigate]);
 
+  const checkMembershipUpdates = useCallback(async () => {
+    try {
+      const response = await api.get("/student/portal");
+      const data = response.data?.data;
+      if (!data?.profile || !Array.isArray(data.organizations)) {
+        throw new Error("Membership status was not returned by the server.");
+      }
+
+      notifyMembershipChanges(data.organizations, data.profile.user_id);
+    } catch (requestError) {
+      if (requestError.response?.status === 401) {
+        localStorage.removeItem("campusconnect_token");
+        sessionStorage.removeItem("campusconnect_token");
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      console.error(
+        "Unable to check organization membership updates:",
+        requestError
+      );
+    }
+  }, [navigate]);
+
   useEffect(() => {
     void Promise.resolve().then(loadPortal);
   }, [loadPortal]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void checkMembershipUpdates();
+      }
+    }, 30000);
+
+    return () => window.clearInterval(intervalId);
+  }, [checkMembershipUpdates]);
 
   useEffect(() => {
     void Promise.resolve().then(loadAnnouncements);
@@ -590,7 +670,7 @@ export default function StudentPortal() {
       const response = await api.post(
         `/student/events/${event.event_id}/register`
       );
-      setNotice(response.data?.message || "Event registration successful.");
+      notifySuccess(response.data?.message || "Event registration successful.");
       await loadPortal();
     } catch (requestError) {
       setError(
@@ -624,7 +704,7 @@ export default function StudentPortal() {
         `/student/organizations/${membershipOrganization.org_id}/join`,
         membershipForm
       );
-      setNotice(
+      notifySuccess(
         response.data?.message || "Membership application submitted."
       );
       setMembershipOrganization(null);
@@ -658,7 +738,7 @@ export default function StudentPortal() {
         yr_id: profileForm.yr_id || null,
         section_id: profileForm.section_id || null,
       });
-      setNotice(response.data?.message || "Profile updated successfully.");
+      notifySuccess(response.data?.message || "Profile updated successfully.");
 
       let savedUser = null;
       let cacheUpdateFailed = false;
@@ -717,7 +797,9 @@ export default function StudentPortal() {
       const response = await api.post("/student/profile/avatar", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setNotice(response.data?.message || "Profile photo updated successfully.");
+      notifySuccess(
+        response.data?.message || "Profile photo updated successfully."
+      );
       await loadPortal();
     } catch (requestError) {
       setError(
