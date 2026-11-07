@@ -183,6 +183,14 @@ $database['main'] = array(
 $config['base_url'] = 'http://localhost:3000/';
 ```
 
+### Vercel frontend routing
+
+The frontend's `vercel.json` sends `/api/*` requests to the deployed Render
+backend and rewrites other paths to `index.html`, so React routes such as
+`/login` work when opened directly. Update the API rewrite destination if the
+backend hostname changes. Deploy the backend and frontend changes for the
+updated routing and API response handling to take effect.
+
 ### Google Calendar
 
 CCS event creation, edits, and deletion are synced to the department's
