@@ -1,59 +1,43 @@
 
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import api from "../api";
+import { getAuthDestination, persistAuthSession } from "../authSession";
+import AuthLayout from "../components/AuthLayout";
+import GoogleSignInButton from "../components/GoogleSignInButton";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(location.state?.email || "");
   const [password, setPassword] = useState("");
-  const [departmentId, setDepartmentId] = useState("");
-  const [departments, setDepartments] = useState([]);
-  const [departmentsLoading, setDepartmentsLoading] = useState(true);
-  const [departmentsError, setDepartmentsError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadDepartments() {
-      try {
-        const response = await api.get("/auth/departments");
-        const data = response.data?.data;
-
-        if (!Array.isArray(data)) {
-          throw new Error("Department list was not returned by the server.");
-        }
-
-        if (active) {
-          setDepartments(data);
-          setDepartmentsError("");
-        }
-      } catch (requestError) {
-        if (active) {
-          setDepartmentsError(
-            requestError.response?.data?.message ||
-              requestError.response?.data?.error ||
-              requestError.message ||
-              "Unable to load departments."
-          );
-        }
-      } finally {
-        if (active) {
-          setDepartmentsLoading(false);
-        }
-      }
+  const finishLogin = (data) => {
+    const { access_token, user } = data;
+    if (!access_token || !user) {
+      setError("Invalid response from the server. Please try again.");
+      return;
     }
 
-    loadDepartments();
-    return () => {
-      active = false;
-    };
-  }, []);
+    const destination = getAuthDestination(user);
+    if (destination === "/login") {
+      setError(
+        user.admin_type === "organization"
+          ? "This organization admin account has no valid department assignment. Please contact the university administrator."
+          : "This admin account has no valid department assignment. Please contact the university administrator."
+      );
+      return;
+    }
+
+    persistAuthSession(data, rememberMe);
+    navigate(destination, { replace: true });
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -70,48 +54,9 @@ export default function Login() {
       const response = await api.post("/auth/login", {
         email: email.trim().toLowerCase(),
         password,
-        dept_id: departmentId || null,
       });
 
-      const { access_token, user } = response.data;
-
-      if (!access_token || !user) {
-        setError("Invalid response from the server. Please try again.");
-        return;
-      }
-
-      // Save authentication data.
-      localStorage.setItem("campusconnect_token", access_token);
-      localStorage.setItem("campusconnect_user", JSON.stringify(user));
-
-      // Keep the user logged in for the current browser session
-      // unless Remember Me is selected.
-      if (rememberMe) {
-        localStorage.setItem("campusconnect_remember", "true");
-      } else {
-        localStorage.removeItem("campusconnect_remember");
-      }
-
-      // Redirect based on the actual role returned by the API.
-      if (user.role === "admin") {
-        if (user.dept_id === null || user.dept_id === "") {
-          navigate("/admin/dashboard", { replace: true });
-          return;
-        }
-
-        const departmentAdminRoutes = {
-          1: "/admin/ccs",
-          2: "/admin/ccje",
-          3: "/admin/cbm",
-          4: "/admin/cas",
-          5: "/admin/btvted",
-          6: "/admin/bsed",
-        };
-        const adminRoute = departmentAdminRoutes[Number(user.dept_id)];
-        navigate(adminRoute || "/login", { replace: true });
-      } else {
-        navigate("/students/home", { replace: true });
-      }
+      finishLogin(response.data);
     } catch (err) {
       const status = err.response?.status;
       const serverMessage =
@@ -137,19 +82,47 @@ export default function Login() {
     }
   };
 
-  return (
-    <main className="auth-page">
-      <section className="auth-card">
-        <Link to="/login" className="auth-brand">
-          <span className="brand-icon">C</span>
-          <span>Campus<span className="brand-highlight">Connect</span></span>
-        </Link>
+  const submitGoogleCredential = async (credential) => {
+    setError("");
+    setGoogleLoading(true);
 
+    try {
+      const response = await api.post("/auth/google", {
+        credential,
+        mode: "auto",
+      });
+      finishLogin(response.data);
+    } catch (requestError) {
+      const status = requestError.response?.status;
+      const serverMessage =
+        requestError.response?.data?.message ||
+        requestError.response?.data?.error;
+
+      if (!requestError.response) {
+        setError("Cannot connect to the server. Please try again.");
+      } else if (status === 404) {
+        setError("No account is registered with this Google email. Create an account first.");
+      } else {
+        setError(serverMessage || "Google sign-in failed. Please try again.");
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleCredential = (credential) => {
+    submitGoogleCredential(credential);
+  };
+
+  return (
+    <AuthLayout>
+      <section className="auth-card">
         <div className="auth-heading">
-          <p className="auth-eyebrow">WELCOME BACK</p>
-          <h1>Sign in to your account</h1>
-          <p>Connect with campus events and your university community.</p>
+          <h1>Welcome back!</h1>
+          <p>Sign in to your account to continue to CampusConnect.</p>
         </div>
+
+        <p className="auth-method-prompt">Choose how you want to sign in:</p>
 
         {error && (
           <div className="auth-alert" role="alert">
@@ -195,37 +168,6 @@ export default function Login() {
             </div>
           </div>
 
-          <div className="form-field">
-            <label htmlFor="login-department">
-              Department <span className="muted-small">(students)</span>
-            </label>
-            <select
-              id="login-department"
-              value={departmentId}
-              onChange={(event) => setDepartmentId(event.target.value)}
-              disabled={departmentsLoading || departments.length === 0}
-            >
-              <option value="">
-                {departmentsLoading
-                  ? "Loading departments..."
-                  : "Select your department"}
-              </option>
-              {departments.map((department) => (
-                <option key={department.dept_id} value={department.dept_id}>
-                  {department.dept_name}
-                </option>
-              ))}
-            </select>
-            <small className="department-help">
-              Students choose their department to see its events and university-wide events.
-            </small>
-            {departmentsError && (
-              <small className="department-error" role="status">
-                {departmentsError}
-              </small>
-            )}
-          </div>
-
           <div className="auth-options">
             <label className="remember-option">
               <input
@@ -241,21 +183,29 @@ export default function Login() {
           <button
             type="submit"
             className="auth-submit"
-            disabled={loading}
+            disabled={loading || googleLoading}
           >
             {loading ? "Signing in..." : "Sign In"}
             {!loading && <span aria-hidden="true">→</span>}
           </button>
         </form>
 
+        <div className="auth-divider"><span>or</span></div>
+        <GoogleSignInButton
+          onCredential={handleGoogleCredential}
+          disabled={loading || googleLoading}
+          iconOnly
+        />
+        {googleLoading && (
+          <p className="auth-google-note" role="status">
+            Verifying your Google account...
+          </p>
+        )}
         <p className="auth-switch">
-          Don't have an account? <Link to="/register">Create one</Link>
+          Don&apos;t have an account? <Link to="/register">Create account</Link>
         </p>
 
-        <p className="auth-footer">
-          Your campus community, all in one place.
-        </p>
       </section>
-    </main>
+    </AuthLayout>
   );
 }

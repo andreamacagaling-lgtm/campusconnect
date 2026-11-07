@@ -1,6 +1,7 @@
 {
     "require": {
         "google/apiclient": "^2.20",
-        "composer/ca-bundle": "^1.5"
+        "composer/ca-bundle": "^1.5",
+        "phpmailer/phpmailer": "^7.1"
     }
 }

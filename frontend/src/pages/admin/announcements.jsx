@@ -5,20 +5,20 @@ import { useNavigate } from "react-router-dom";
 import "./Announcements.css";
 
 const API_BASE_URL =
-    import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:3000";
+    import.meta.env.VITE_API_BASE_URL || "";
 
 const ANNOUNCEMENTS_API = `${API_BASE_URL}/api/announcements`;
 
 const EMPTY_FORM = {
     title: "",
     body: "",
+    event_id: "",
 };
 
 const NAV_ITEMS = [
     { label: "Dashboard", path: "/admin/dashboard", icon: "⌂" },
     { label: "Announcements", path: "/admin/announcements", icon: "▤" },
     { label: "Events", path: "/admin/events", icon: "▦" },
-    { label: "Organizations", path: "/admin/organizations", icon: "♧" },
     { label: "Attendance", path: "/admin/attendance", icon: "✓" },
     { label: "Admin Profile", path: "/admin/adminprofile", icon: "◎" },
 ];
@@ -31,6 +31,18 @@ function getToken() {
         sessionStorage.getItem("token") ||
         ""
     );
+}
+
+function getUser() {
+    try {
+        return JSON.parse(
+            localStorage.getItem("campusconnect_user") ||
+                sessionStorage.getItem("campusconnect_user") ||
+                "null"
+        );
+    } catch {
+        return null;
+    }
 }
 
 function getErrorMessage(err, fallback) {
@@ -83,7 +95,7 @@ function AdminSidebar({ activePage }) {
     return (
         <aside className="admin-sidebar">
             <div className="admin-brand">
-                <div className="admin-brand-logo">CC</div>
+                <img className="admin-brand-logo" src="/images/msu-seal.png" alt="" />
                 <div>
                     <h2>CampusConnect</h2>
                     <span>ADMIN PORTAL</span>
@@ -132,8 +144,17 @@ function AdminSidebar({ activePage }) {
 
 export default function Announcements() {
     const navigate = useNavigate();
+    const user = getUser();
+    const adminType = user?.admin_type;
+    const adminDeptId = user?.dept_id;
+    const canNotifyForEvents =
+        user?.role === "admin" &&
+        ["usg", "department"].includes(adminType);
 
     const [announcements, setAnnouncements] = useState([]);
+    const [upcomingEvents, setUpcomingEvents] = useState([]);
+    const [loadingUpcomingEvents, setLoadingUpcomingEvents] = useState(false);
+    const [upcomingEventsError, setUpcomingEventsError] = useState("");
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -201,8 +222,85 @@ export default function Announcements() {
     }, [getHeaders, handleUnauthorized]);
 
     useEffect(() => {
-        fetchAnnouncements();
+        void Promise.resolve().then(fetchAnnouncements);
     }, [fetchAnnouncements]);
+
+    useEffect(() => {
+        if (!showModal || editingId !== null || !canNotifyForEvents) return undefined;
+
+        let active = true;
+        void Promise.resolve()
+            .then(() => {
+                if (!active) return undefined;
+                setLoadingUpcomingEvents(true);
+                setUpcomingEventsError("");
+                return axios.get(`${API_BASE_URL}/api/events`, {
+                    headers: getHeaders(),
+                });
+            })
+            .then((response) => {
+                if (!active || !response) return;
+                const rows = response.data?.data;
+                if (!Array.isArray(rows)) {
+                    throw new Error("Upcoming events were not returned by the server.");
+                }
+
+                const now = Date.now();
+                const availableEvents = rows.filter((event) => {
+                    const start = new Date(
+                        String(event.start_datetime || "").replace(" ", "T")
+                    ).getTime();
+                    const eventDeptId =
+                        event.dept_id === null || event.dept_id === ""
+                            ? null
+                            : Number(event.dept_id);
+                    const accountDeptId =
+                        adminDeptId === null || adminDeptId === ""
+                            ? null
+                            : Number(adminDeptId);
+                    const isManagedEvent =
+                        adminType === "usg"
+                            ? eventDeptId === null
+                            : eventDeptId === accountDeptId &&
+                              accountDeptId !== null;
+
+                    return (
+                        isManagedEvent &&
+                        event.approval_status === "approved" &&
+                        event.status === "upcoming" &&
+                        Number.isFinite(start) &&
+                        start > now
+                    );
+                });
+                setUpcomingEvents(availableEvents);
+            })
+            .catch((requestError) => {
+                if (!active) return;
+                if (!handleUnauthorized(requestError)) {
+                    setUpcomingEventsError(
+                        getErrorMessage(
+                            requestError,
+                            "Unable to load approved upcoming events."
+                        )
+                    );
+                }
+            })
+            .finally(() => {
+                if (active) setLoadingUpcomingEvents(false);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [
+        showModal,
+        editingId,
+        canNotifyForEvents,
+        adminType,
+        adminDeptId,
+        getHeaders,
+        handleUnauthorized,
+    ]);
 
     function openAddModal() {
         setEditingId(null);
@@ -218,6 +316,7 @@ export default function Announcements() {
         setForm({
             title: item.title ?? "",
             body: item.body ?? "",
+            event_id: item.event_id ? String(item.event_id) : "",
         });
 
         setError("");
@@ -265,23 +364,25 @@ export default function Announcements() {
 
         try {
             const payload = { title, body };
+            let response;
 
             if (editingId !== null) {
-                await axios.put(
+                response = await axios.put(
                     `${ANNOUNCEMENTS_API}/${editingId}`,
                     payload,
                     { headers: getHeaders() }
                 );
-
-                setSuccess("Annoucement updated successfully.");
             } else {
-                await axios.post(
+                response = await axios.post(
                     ANNOUNCEMENTS_API,
-                    payload,
+                    {
+                        ...payload,
+                        ...(form.event_id
+                            ? { event_id: Number(form.event_id) }
+                            : {}),
+                    },
                     { headers: getHeaders() }
                 );
-
-                setSuccess("Announcement added successfully.");
             }
 
             setShowModal(false);
@@ -289,6 +390,19 @@ export default function Announcements() {
             setForm(EMPTY_FORM);
 
             await fetchAnnouncements();
+
+            if (response.data?.email_notification?.success === false) {
+                setError(
+                    `${response.data.message} ${response.data.email_notification.message}`
+                );
+            } else {
+                setSuccess(
+                    response.data?.message ||
+                        (editingId !== null
+                            ? "Announcement updated successfully."
+                            : "Announcement added successfully.")
+                );
+            }
         } catch (err) {
             if (!handleUnauthorized(err)) {
                 setError(
@@ -659,6 +773,51 @@ export default function Announcements() {
                                     required
                                 />
                             </div>
+
+                            {canNotifyForEvents && editingId === null && (
+                                <div className="announcements-form-group">
+                                    <label htmlFor="announcement-event">
+                                        Notify students about an event
+                                    </label>
+                                    <select
+                                        id="announcement-event"
+                                        name="event_id"
+                                        value={form.event_id}
+                                        onChange={handleChange}
+                                        disabled={loadingUpcomingEvents || saving}
+                                    >
+                                        <option value="">
+                                            No event notification
+                                        </option>
+                                        {upcomingEvents.map((event) => (
+                                            <option
+                                                key={event.event_id}
+                                                value={event.event_id}
+                                            >
+                                                {event.title} — {formatDateTime(event.start_datetime)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <small>
+                                        This emails eligible students when registration opens and sends a start-time reminder to registered students. It also adds a registration alert in the student portal.
+                                    </small>
+                                    {loadingUpcomingEvents && (
+                                        <small>Loading approved upcoming campus events…</small>
+                                    )}
+                                    {!loadingUpcomingEvents &&
+                                        !upcomingEventsError &&
+                                        upcomingEvents.length === 0 && (
+                                            <small>
+                                                No future, OSSE-approved events are available for your account. Submit an event with a future start time and wait for OSSE approval before linking it here.
+                                            </small>
+                                        )}
+                                    {upcomingEventsError && (
+                                        <small role="alert">
+                                            {upcomingEventsError}
+                                        </small>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="announcements-modal-actions">
                                 <button

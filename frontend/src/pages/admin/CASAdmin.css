@@ -41,15 +41,13 @@
 }
 
 .cas-brand-icon {
-  display: grid;
+  display: block;
   width: 43px;
   height: 43px;
-  flex-shrink: 0;
-  place-items: center;
-  border-radius: 12px;
-  background: #2b9b62;
-  font-size: 23px;
-  font-weight: 800;
+  flex: 0 0 43px;
+  border-radius: 50%;
+  background: #fff;
+  object-fit: cover;
 }
 
 .cas-brand strong,

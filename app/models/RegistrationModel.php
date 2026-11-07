@@ -3,24 +3,26 @@
 defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed');
 
 /**
- * Model: OrganizationsModel
+ * Model: RegistrationModel
  */
-class OrganizationsModel extends Model
+class RegistrationModel extends Model
 {
-    protected $table = 'organizations';
-    protected $primary_key = 'org_id';
+    protected $table = 'org_registrations';
+    protected $primary_key = 'reg_id';
 
     protected $fillable = [
-        'org_name',
-        'category',
-        'description',
-        'eligibility',
-        'status'
+        'org_id',
+        'user_id',
+        'status',
+        'applicant_full_name',
+        'applicant_department',
+        'applicant_section',
+        'applicant_year_level'
     ];
 
     protected $guarded = [
-        'org_id',
-        'created_at'
+        'reg_id',
+        'registered_at'
     ];
 
     public function __construct()

@@ -25,16 +25,13 @@
 }
 
 .student-brand-mark {
-  display: grid;
+  display: block;
   width: 42px;
   height: 42px;
-  flex-shrink: 0;
-  place-items: center;
-  border-radius: 12px;
-  background: #2b9b62;
-  font-family: Manrope, sans-serif;
-  font-size: 23px;
-  font-weight: 800;
+  flex: 0 0 42px;
+  border-radius: 50%;
+  background: #fff;
+  object-fit: cover;
 }
 
 .student-brand strong,
@@ -110,6 +107,7 @@
 }
 
 .student-avatar {
+  position: relative;
   display: grid;
   width: 39px;
   height: 39px;
@@ -120,6 +118,17 @@
   color: #17623c;
   font-size: 14px;
   font-weight: 800;
+  overflow: hidden;
+}
+
+.student-avatar img,
+.student-profile-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
 }
 
 .student-sidebar-name {
@@ -442,6 +451,10 @@
   margin-bottom: 15px;
 }
 
+.student-history-heading {
+  margin-top: 30px;
+}
+
 .student-section-heading h2 {
   margin: 0;
   font-family: Manrope, sans-serif;
@@ -511,10 +524,90 @@
   white-space: pre-wrap;
 }
 
+.student-event-announcement {
+  border-left-color: #4385cf;
+}
+
+.student-announcement-event {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 15px;
+  padding-top: 13px;
+  border-top: 1px solid #e8eee9;
+}
+
+.student-announcement-event > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.student-announcement-event strong {
+  color: #26392c;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.student-announcement-event > div span {
+  color: #718176;
+  font-size: 10px;
+}
+
 .student-event-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+
+.student-history-list {
+  border-top: 1px solid #e5ece7;
+}
+
+.student-history-row {
+  display: flex;
+  min-height: 60px;
+  align-items: center;
+  gap: 18px;
+  padding: 11px 4px;
+  border-bottom: 1px solid #e5ece7;
+}
+
+.student-history-row > time {
+  width: 112px;
+  flex: 0 0 112px;
+  color: #65756a;
+  font-size: 11px;
+}
+
+.student-history-info {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 4px;
+}
+
+.student-history-info strong {
+  overflow: hidden;
+  color: #26392c;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-history-info span {
+  overflow: hidden;
+  color: #7b8880;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-history-status {
+  flex: 0 0 auto;
+  color: #718176;
+  font-size: 10px;
 }
 
 .student-event-card {
@@ -675,6 +768,14 @@
   border: 1px solid #dfe9e1;
   border-radius: 10px;
   background: #fff;
+}
+
+.student-event-qr-avatar {
+  width: 52px;
+  height: 52px;
+  border: 2px solid #2b9b62;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .student-event-qr span,
@@ -858,14 +959,35 @@
 }
 
 .student-organization-card {
+  position: relative;
   display: flex;
-  min-height: 280px;
+  min-height: 300px;
   flex-direction: column;
   align-items: flex-start;
-  padding: 20px;
-  border: 1px solid #e5ece7;
-  border-radius: 12px;
+  overflow: hidden;
+  padding: 22px;
+  border: 1px solid #e2ebe5;
+  border-radius: 15px;
   background: #fff;
+  box-shadow: 0 7px 22px rgb(22 61 39 / 5%);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.student-organization-card::before {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #176c42, #b8e889);
+  content: "";
+}
+
+.student-organization-card:hover {
+  transform: translateY(-3px);
+  border-color: #bfddc9;
+  box-shadow: 0 14px 30px rgb(22 61 39 / 10%);
 }
 
 .student-org-mark {
@@ -873,7 +995,8 @@
   width: 44px;
   height: 44px;
   place-items: center;
-  border-radius: 13px;
+  border: 1px solid #d6efdf;
+  border-radius: 14px;
   background: #e9f7ee;
   color: #16794b;
   font-family: Manrope, sans-serif;
@@ -891,16 +1014,17 @@
 }
 
 .student-organization-card h3 {
-  margin: 6px 0 7px;
+  margin: 8px 0;
   font-family: Manrope, sans-serif;
-  font-size: 14px;
+  font-size: 16px;
+  line-height: 1.4;
 }
 
 .student-organization-card > p {
   margin: 0;
   color: #738178;
-  font-size: 10px;
-  line-height: 1.65;
+  font-size: 12px;
+  line-height: 1.7;
 }
 
 .student-org-eligibility {
@@ -919,7 +1043,7 @@
 .student-organization-card > .student-button,
 .student-membership-state {
   margin-top: auto;
-  padding-top: 17px;
+  padding-top: 20px;
 }
 
 .student-membership-state {
@@ -1135,6 +1259,7 @@
 }
 
 .student-profile-avatar {
+  position: relative;
   display: grid;
   width: 54px;
   height: 54px;
@@ -1144,6 +1269,8 @@
   color: #176c42;
   font-size: 21px;
   font-weight: 800;
+  overflow: hidden;
+  flex: 0 0 54px;
 }
 
 .student-profile-summary strong,
@@ -1162,6 +1289,37 @@
   font-size: 10px;
 }
 
+.student-avatar-upload {
+  display: inline-flex;
+  margin-top: 8px;
+  color: #16794b;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.student-avatar-upload:focus-within {
+  outline: 2px solid #168346;
+  outline-offset: 3px;
+}
+
+.student-avatar-upload input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.student-profile-summary div > small {
+  display: block;
+  margin-top: 4px;
+  color: #879188;
+  font-size: 9px;
+}
+
 .student-profile-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1177,7 +1335,8 @@
   font-weight: 700;
 }
 
-.student-profile-fields input {
+.student-profile-fields input,
+.student-profile-fields select {
   width: 100%;
   min-height: 40px;
   padding: 9px 11px;
@@ -1190,9 +1349,17 @@
   font-size: 11px;
 }
 
-.student-profile-fields input[readonly] {
+.student-profile-fields input[readonly],
+.student-profile-fields select:disabled {
   background: #f7f9f7;
   color: #77847c;
+}
+
+.student-profile-help {
+  color: #a15a24;
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
 .student-profile-actions {
@@ -1410,6 +1577,26 @@
 
   .student-event-image {
     height: 160px;
+  }
+
+  .student-history-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+  }
+
+  .student-history-row > time {
+    width: auto;
+    flex-basis: auto;
+  }
+
+  .student-history-info {
+    flex-basis: calc(100% - 12px);
+    order: 1;
+  }
+
+  .student-history-status {
+    margin-left: auto;
   }
 
   .student-event-toolbar {

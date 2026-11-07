@@ -15,7 +15,8 @@ class OrganizationsModel extends Model
         'category',
         'description',
         'eligibility',
-        'status'
+        'status',
+        'dept_id'
     ];
 
     protected $guarded = [

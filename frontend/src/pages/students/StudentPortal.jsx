@@ -20,6 +20,7 @@ const EVENT_FILTERS = [
 ];
 
 const EMPTY_EVENTS = [];
+const EMPTY_ACADEMIC_OPTIONS = [];
 
 function getEventStatus(event) {
   if (event.status === "cancelled") return "cancelled";
@@ -47,6 +48,7 @@ function formatDate(value, options = {}) {
   return date.toLocaleString("en-PH", {
     dateStyle: "medium",
     timeStyle: "short",
+    hour12: true,
     ...options,
   });
 }
@@ -56,6 +58,23 @@ function getErrorMessage(error, fallback) {
     error?.response?.data?.message ||
     error?.response?.data?.error ||
     fallback
+  );
+}
+
+function StudentAvatar({ profile, className = "" }) {
+  return (
+    <span className={`${className} student-avatar`}>
+      {(profile?.full_name || "S").charAt(0).toUpperCase()}
+      {profile?.avatar && (
+        <img
+          src={profile.avatar}
+          alt=""
+          onError={(event) => {
+            event.currentTarget.hidden = true;
+          }}
+        />
+      )}
+    </span>
   );
 }
 
@@ -71,7 +90,7 @@ function StudentSidebar({ section, profile, navigate }) {
   return (
     <aside className="student-sidebar">
       <Link to="/students/home" className="student-brand">
-        <span className="student-brand-mark">C</span>
+        <img className="student-brand-mark" src="/images/msu-seal.png" alt="" />
         <span>
           <strong>CampusConnect</strong>
           <small>STUDENT PORTAL</small>
@@ -99,9 +118,7 @@ function StudentSidebar({ section, profile, navigate }) {
 
       <div className="student-sidebar-bottom">
         <div className="student-sidebar-profile">
-          <span className="student-avatar">
-            {(profile?.full_name || "S").charAt(0).toUpperCase()}
-          </span>
+          <StudentAvatar profile={profile} />
           <span className="student-sidebar-name">
             <strong>{profile?.full_name || "Student"}</strong>
             <small>{profile?.dept_name || "Student account"}</small>
@@ -132,7 +149,11 @@ function EventCard({ event, onRegister, registering }) {
     end <= new Date();
 
   return (
-    <article className="student-event-card">
+    <article
+      className="student-event-card"
+      id={`student-event-${event.event_id}`}
+      tabIndex={-1}
+    >
       {event.image ? (
         <img
           className="student-event-image"
@@ -150,9 +171,10 @@ function EventCard({ event, onRegister, registering }) {
       <div className="student-event-card-content">
         <div className="student-event-card-topline">
           <span className="student-event-category">
-            {event.dept_id === null || event.dept_id === ""
+            {event.org_name ||
+              (event.dept_id === null || event.dept_id === ""
               ? "University-wide"
-              : event.dept_name || "Department event"}
+              : event.dept_name || "Department event")}
           </span>
           <span className={`student-status ${status}`}>{status}</span>
         </div>
@@ -237,13 +259,49 @@ function EventSection({
   );
 }
 
+function EventAnnouncementNotice({
+  announcement,
+  event,
+}) {
+  return (
+    <article
+      className={`student-announcement-card ${
+        event ? "student-event-announcement" : ""
+      }`}
+    >
+      <div className="student-announcement-heading">
+        <h3>{announcement.title}</h3>
+        {announcement.created_at && (
+          <time dateTime={announcement.created_at}>
+            {formatDate(announcement.created_at)}
+          </time>
+        )}
+      </div>
+      <p>{announcement.body}</p>
+      {event && (
+        <div className="student-announcement-event">
+          <div>
+            <strong>{event.title}</strong>
+            <span>
+              {formatDate(event.start_datetime)} ·{" "}
+              {event.venue || "Venue to be announced"}
+            </span>
+          </div>
+        </div>
+      )}
+    </article>
+  );
+}
+
 export default function StudentPortal() {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
-  const section = pathname.split("/")[2] || "home";
+  const { pathname, search: locationSearch } = useLocation();
+  const routeSection = pathname.split("/")[2] || "home";
+  const section = routeSection === "history" ? "events" : routeSection;
 
   const [portal, setPortal] = useState(null);
   const [announcements, setAnnouncements] = useState([]);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
   const [announcementsError, setAnnouncementsError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -251,14 +309,42 @@ export default function StudentPortal() {
   const [registeringEventId, setRegisteringEventId] = useState(null);
   const [joiningOrganizationId, setJoiningOrganizationId] = useState(null);
   const [membershipOrganization, setMembershipOrganization] = useState(null);
+  const [membershipForm, setMembershipForm] = useState({
+    full_name: "",
+    department: "",
+    section: "",
+    year_level: "",
+  });
   const [eventSearch, setEventSearch] = useState("");
   const [eventFilter, setEventFilter] = useState("all");
   const [profileForm, setProfileForm] = useState({
     full_name: "",
     student_no: "",
     contact_number: "",
+    yr_id: "",
+    section_id: "",
   });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const loadAnnouncements = useCallback(async () => {
+    try {
+      const response = await api.get("/announcements");
+      const rows = response.data?.data;
+      if (!Array.isArray(rows)) {
+        throw new Error("Announcement data was not returned by the server.");
+      }
+      setAnnouncements(rows);
+      setAnnouncementsError("");
+    } catch (requestError) {
+      setAnnouncements([]);
+      setAnnouncementsError(
+        getErrorMessage(requestError, "Unable to load announcements.")
+      );
+    } finally {
+      setLoadingAnnouncements(false);
+    }
+  }, []);
 
   const loadPortal = useCallback(async () => {
     try {
@@ -275,22 +361,11 @@ export default function StudentPortal() {
         full_name: data.profile.full_name || "",
         student_no: data.profile.student_no || "",
         contact_number: data.profile.contact_number || "",
+        yr_id: data.profile.yr_id ? String(data.profile.yr_id) : "",
+        section_id: data.profile.section_id
+          ? String(data.profile.section_id)
+          : "",
       });
-
-      try {
-        const announcementsResponse = await api.get("/announcements");
-        const rows = announcementsResponse.data?.data;
-        if (!Array.isArray(rows)) {
-          throw new Error("Announcement data was not returned by the server.");
-        }
-        setAnnouncements(rows);
-        setAnnouncementsError("");
-      } catch (requestError) {
-        setAnnouncements([]);
-        setAnnouncementsError(
-          getErrorMessage(requestError, "Unable to load announcements.")
-        );
-      }
     } catch (requestError) {
       if (requestError.response?.status === 401) {
         localStorage.removeItem("campusconnect_token");
@@ -315,7 +390,42 @@ export default function StudentPortal() {
     void Promise.resolve().then(loadPortal);
   }, [loadPortal]);
 
+  useEffect(() => {
+    void Promise.resolve().then(loadAnnouncements);
+  }, [loadAnnouncements]);
+
+  useEffect(() => {
+    if (section !== "events") return;
+
+    const eventId = new URLSearchParams(locationSearch).get("event_id");
+    if (!eventId) return;
+
+    document
+      .getElementById(`student-event-${eventId}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [locationSearch, portal, section]);
+
   const profile = portal?.profile;
+  const academicOptions =
+    portal?.academic_options || EMPTY_ACADEMIC_OPTIONS;
+  const profileYearOptions = useMemo(() => {
+    const years = new Map();
+    academicOptions.forEach((option) => {
+      years.set(String(option.yr_id), option.yr_name);
+    });
+    return [...years.entries()];
+  }, [academicOptions]);
+  const profileSectionOptions = useMemo(
+    () =>
+      academicOptions.filter(
+        (option) => String(option.yr_id) === profileForm.yr_id
+      ).sort((left, right) =>
+        left.section_name.localeCompare(right.section_name, undefined, {
+          numeric: true,
+        })
+      ),
+    [academicOptions, profileForm.yr_id]
+  );
   const allEvents = portal?.events || EMPTY_EVENTS;
   const organizations = portal?.organizations || [];
   const myEvents = useMemo(
@@ -344,26 +454,102 @@ export default function StudentPortal() {
   const filteredEvents = useMemo(() => {
     const searchTerm = eventSearch.trim().toLowerCase();
 
-    return allEvents.filter((event) => {
-      const isUniversityEvent =
-        event.dept_id === null || event.dept_id === "";
-      const matchesFilter =
-        eventFilter === "all" ||
-        (eventFilter === "department" && !isUniversityEvent) ||
-        (eventFilter === "university" && isUniversityEvent);
-      const matchesSearch = [
-        event.title,
-        event.description,
-        event.venue,
-        event.category_name,
-        event.dept_name,
-      ].some((value) =>
-        String(value || "").toLowerCase().includes(searchTerm)
-      );
+    const statusOrder = {
+      upcoming: 0,
+      ongoing: 1,
+      completed: 2,
+      cancelled: 3,
+    };
 
-      return matchesFilter && matchesSearch;
-    });
+    return allEvents
+      .filter((event) => {
+        const isUniversityEvent =
+          event.dept_id === null || event.dept_id === "";
+        const matchesFilter =
+          eventFilter === "all" ||
+          (eventFilter === "department" && !isUniversityEvent) ||
+          (eventFilter === "university" && isUniversityEvent);
+        const matchesSearch = [
+          event.title,
+          event.description,
+          event.venue,
+          event.category_name,
+          event.dept_name,
+          event.org_name,
+        ].some((value) =>
+          String(value || "").toLowerCase().includes(searchTerm)
+        );
+
+        return matchesFilter && matchesSearch;
+      })
+      .sort((left, right) => {
+        const leftStatus = getEventStatus(left);
+        const rightStatus = getEventStatus(right);
+        const statusDifference =
+          (statusOrder[leftStatus] ?? 4) - (statusOrder[rightStatus] ?? 4);
+
+        if (statusDifference !== 0) return statusDifference;
+
+        const leftStart = new Date(
+          String(left.start_datetime || "").replace(" ", "T")
+        ).getTime();
+        const rightStart = new Date(
+          String(right.start_datetime || "").replace(" ", "T")
+        ).getTime();
+
+        if (!Number.isFinite(leftStart) && !Number.isFinite(rightStart)) return 0;
+        if (!Number.isFinite(leftStart)) return 1;
+        if (!Number.isFinite(rightStart)) return -1;
+        return leftStart - rightStart;
+      });
   }, [allEvents, eventFilter, eventSearch]);
+  const activeEvents = useMemo(
+    () =>
+      filteredEvents.filter((event) => getEventStatus(event) !== "completed"),
+    [filteredEvents]
+  );
+  const completedEvents = useMemo(
+    () =>
+      filteredEvents
+        .filter((event) => getEventStatus(event) === "completed")
+        .sort((left, right) => {
+          const leftEnd = new Date(
+            String(left.end_datetime || left.start_datetime || "").replace(
+              " ",
+              "T"
+            )
+          ).getTime();
+          const rightEnd = new Date(
+            String(right.end_datetime || right.start_datetime || "").replace(
+              " ",
+              "T"
+            )
+          ).getTime();
+
+          if (!Number.isFinite(leftEnd) && !Number.isFinite(rightEnd)) return 0;
+          if (!Number.isFinite(leftEnd)) return 1;
+          if (!Number.isFinite(rightEnd)) return -1;
+          return rightEnd - leftEnd;
+        }),
+    [filteredEvents]
+  );
+  const eventAnnouncementRows = useMemo(
+    () =>
+      announcements.flatMap((announcement) => {
+        const event = allEvents.find(
+          (item) => String(item.event_id) === String(announcement.event_id)
+        );
+        return event ? [{ announcement, event }] : [];
+      }),
+    [allEvents, announcements]
+  );
+  const upcomingEventAnnouncementRows = useMemo(
+    () =>
+      eventAnnouncementRows
+        .filter(({ event }) => getEventStatus(event) === "upcoming")
+        .slice(0, 3),
+    [eventAnnouncementRows]
+  );
 
   async function handleRegister(event) {
     setError("");
@@ -386,6 +572,12 @@ export default function StudentPortal() {
   }
 
   function handleJoinOrganization(organization) {
+    setMembershipForm({
+      full_name: "",
+      department: "",
+      section: "",
+      year_level: "",
+    });
     setMembershipOrganization(organization);
   }
 
@@ -399,7 +591,8 @@ export default function StudentPortal() {
 
     try {
       const response = await api.post(
-        `/student/organizations/${membershipOrganization.org_id}/join`
+        `/student/organizations/${membershipOrganization.org_id}/join`,
+        membershipForm
       );
       setNotice(
         response.data?.message || "Membership application submitted."
@@ -430,7 +623,11 @@ export default function StudentPortal() {
     setSavingProfile(true);
 
     try {
-      const response = await api.put("/student/profile", profileForm);
+      const response = await api.put("/student/profile", {
+        ...profileForm,
+        yr_id: profileForm.yr_id || null,
+        section_id: profileForm.section_id || null,
+      });
       setNotice(response.data?.message || "Profile updated successfully.");
 
       let savedUser = null;
@@ -465,6 +662,40 @@ export default function StudentPortal() {
       );
     } finally {
       setSavingProfile(false);
+    }
+  }
+
+  async function handleAvatarUpload(event) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    setError("");
+    setNotice("");
+
+    if (file.size > 2000 * 1024 * 1024) {
+      setError("Profile photos must be 2000 MB or smaller.");
+      input.value = "";
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("avatar", file);
+    setUploadingAvatar(true);
+
+    try {
+      const response = await api.post("/student/profile/avatar", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setNotice(response.data?.message || "Profile photo updated successfully.");
+      await loadPortal();
+    } catch (requestError) {
+      setError(
+        getErrorMessage(requestError, "Unable to upload your profile photo.")
+      );
+    } finally {
+      setUploadingAvatar(false);
+      input.value = "";
     }
   }
 
@@ -518,9 +749,7 @@ export default function StudentPortal() {
             <h1>{pageTitle}</h1>
           </div>
           <div className="student-topbar-user">
-            <span className="student-avatar">
-              {(profile.full_name || "S").charAt(0).toUpperCase()}
-            </span>
+            <StudentAvatar profile={profile} />
             <span>
               <strong>{profile.full_name}</strong>
               <small>{profile.dept_name || "Department not assigned"}</small>
@@ -594,6 +823,36 @@ export default function StudentPortal() {
                   <span><small>My registrations</small><strong>{myEvents.length}</strong></span>
                 </div>
               </section>
+
+              {upcomingEventAnnouncementRows.length > 0 && (
+                <section className="student-section">
+                  <div className="student-section-heading">
+                    <div>
+                      <h2>Upcoming event alerts</h2>
+                      <p>
+                        Administrator announcements about upcoming events.
+                      </p>
+                    </div>
+                    <Link
+                      to="/students/announcements"
+                      className="student-text-link"
+                    >
+                      All announcements <span aria-hidden="true">→</span>
+                    </Link>
+                  </div>
+                  <div className="student-announcement-list">
+                    {upcomingEventAnnouncementRows.map(
+                      ({ announcement, event }) => (
+                        <EventAnnouncementNotice
+                          key={announcement.announcement_id}
+                          announcement={announcement}
+                          event={event}
+                        />
+                      )
+                    )}
+                  </div>
+                </section>
+              )}
 
               <EventSection
                 title="Ongoing Events"
@@ -684,7 +943,7 @@ export default function StudentPortal() {
                 </div>
               </div>
               <div className="student-event-grid">
-                {filteredEvents.map((event) => (
+                {activeEvents.map((event) => (
                   <EventCard
                     event={event}
                     key={event.event_id}
@@ -693,10 +952,52 @@ export default function StudentPortal() {
                   />
                 ))}
               </div>
-              {filteredEvents.length === 0 && (
+              {activeEvents.length === 0 && (
                 <div className="student-empty-state">
                   <span aria-hidden="true">⌕</span>
-                  <p>No events match this search or filter.</p>
+                  <p>No upcoming or ongoing events match this search or filter.</p>
+                </div>
+              )}
+
+              <div className="student-section-heading student-history-heading">
+                <div>
+                  <h2>History</h2>
+                  <p>Completed events, with the most recent listed first.</p>
+                </div>
+                <span className="student-section-count">
+                  {completedEvents.length}
+                </span>
+              </div>
+              {completedEvents.length > 0 ? (
+                <div className="student-history-list">
+                  {completedEvents.map((event) => (
+                    <div className="student-history-row" key={event.event_id}>
+                      <time dateTime={event.start_datetime}>
+                        {event.start_datetime
+                          ? new Date(
+                              String(event.start_datetime).replace(" ", "T")
+                            ).toLocaleDateString("en-PH", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })
+                          : "Date not specified"}
+                      </time>
+                      <div className="student-history-info">
+                        <strong>{event.title}</strong>
+                        <span>
+                          {event.venue || "Venue not specified"}
+                          {event.dept_name ? ` · ${event.dept_name}` : ""}
+                        </span>
+                      </div>
+                      <span className="student-history-status">Completed</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="student-empty-state">
+                  <span aria-hidden="true">◷</span>
+                  <p>No completed events match this search or filter.</p>
                 </div>
               )}
             </section>
@@ -717,6 +1018,10 @@ export default function StudentPortal() {
                 <div className="student-empty-state" role="alert">
                   <p>{announcementsError}</p>
                 </div>
+              ) : loadingAnnouncements ? (
+                <div className="student-empty-state">
+                  <p>Loading announcements...</p>
+                </div>
               ) : announcements.length === 0 ? (
                 <div className="student-empty-state">
                   <span aria-hidden="true">▤</span>
@@ -724,22 +1029,21 @@ export default function StudentPortal() {
                 </div>
               ) : (
                 <div className="student-announcement-list">
-                  {announcements.map((announcement) => (
-                    <article
-                      className="student-announcement-card"
-                      key={announcement.announcement_id}
-                    >
-                      <div className="student-announcement-heading">
-                        <h3>{announcement.title}</h3>
-                        {announcement.created_at && (
-                          <time dateTime={announcement.created_at}>
-                            {formatDate(announcement.created_at)}
-                          </time>
-                        )}
-                      </div>
-                      <p>{announcement.body}</p>
-                    </article>
-                  ))}
+                  {announcements.map((announcement) => {
+                    const event = allEvents.find(
+                      (item) =>
+                        String(item.event_id) ===
+                        String(announcement.event_id)
+                    );
+
+                    return (
+                      <EventAnnouncementNotice
+                        key={announcement.announcement_id}
+                        announcement={announcement}
+                        event={event}
+                      />
+                    );
+                  })}
                 </div>
               )}
             </section>
@@ -842,8 +1146,7 @@ export default function StudentPortal() {
                       {membershipOrganization.org_name}
                     </h2>
                     <p>
-                      Review your student details before submitting your
-                      application.
+                      Enter your student information to apply for membership.
                     </p>
                   </div>
                   <button
@@ -862,39 +1165,67 @@ export default function StudentPortal() {
                     <label>
                       Full name
                       <input
-                        value={profile.full_name || ""}
-                        readOnly
-                        aria-readonly="true"
+                        name="full_name"
+                        value={membershipForm.full_name}
+                        onChange={(event) =>
+                          setMembershipForm((current) => ({
+                            ...current,
+                            full_name: event.target.value,
+                          }))
+                        }
+                        maxLength={150}
+                        autoComplete="name"
+                        required
                       />
                     </label>
                     <label>
                       Department
                       <input
-                        value={profile.dept_name || "Not assigned"}
-                        readOnly
-                        aria-readonly="true"
+                        name="department"
+                        value={membershipForm.department}
+                        onChange={(event) =>
+                          setMembershipForm((current) => ({
+                            ...current,
+                            department: event.target.value,
+                          }))
+                        }
+                        maxLength={150}
+                        required
                       />
                     </label>
                     <label>
                       Section
                       <input
-                        value={profile.section_name || "Not assigned"}
-                        readOnly
-                        aria-readonly="true"
+                        name="section"
+                        value={membershipForm.section}
+                        onChange={(event) =>
+                          setMembershipForm((current) => ({
+                            ...current,
+                            section: event.target.value,
+                          }))
+                        }
+                        maxLength={100}
+                        required
                       />
                     </label>
                     <label>
                       Year level
                       <input
-                        value={profile.yr_name || "Not assigned"}
-                        readOnly
-                        aria-readonly="true"
+                        name="year_level"
+                        value={membershipForm.year_level}
+                        onChange={(event) =>
+                          setMembershipForm((current) => ({
+                            ...current,
+                            year_level: event.target.value,
+                          }))
+                        }
+                        maxLength={50}
+                        required
                       />
                     </label>
                   </div>
                   <p className="student-membership-note">
-                    These details come from your student profile. Contact an
-                    administrator if they need correction.
+                    All four fields are required for your application.
                   </p>
                   <div className="student-membership-actions">
                     <button
@@ -979,6 +1310,13 @@ export default function StudentPortal() {
                             <td>
                               {event.qr_token ? (
                                 <div className="student-event-qr">
+                                  {profile.avatar && (
+                                    <img
+                                      className="student-event-qr-avatar"
+                                      src={profile.avatar}
+                                      alt={`${profile.full_name} profile`}
+                                    />
+                                  )}
                                   <QRCodeSVG
                                     value={event.qr_token}
                                     size={112}
@@ -1020,10 +1358,29 @@ export default function StudentPortal() {
                 <div className="student-profile-summary">
                   <span className="student-profile-avatar">
                     {(profile.full_name || "S").charAt(0).toUpperCase()}
+                    {profile.avatar && (
+                      <img
+                        src={profile.avatar}
+                        alt={`${profile.full_name} profile`}
+                        onError={(event) => {
+                          event.currentTarget.hidden = true;
+                        }}
+                      />
+                    )}
                   </span>
                   <div>
                     <strong>{profile.full_name}</strong>
                     <span>{profile.email}</span>
+                    <label className="student-avatar-upload">
+                      {uploadingAvatar ? "Uploading photo..." : "Change profile photo"}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handleAvatarUpload}
+                        disabled={uploadingAvatar}
+                      />
+                    </label>
+                    <small>JPEG, PNG, or WebP; up to 2000 MB.</small>
                   </div>
                 </div>
                 <div className="student-profile-fields">
@@ -1077,15 +1434,58 @@ export default function StudentPortal() {
                     <input value={profile.dept_name || "Not assigned"} readOnly />
                   </label>
                   <label>
-                    Year level and section
-                    <input
-                      value={
-                        [profile.yr_name, profile.section_name]
-                          .filter(Boolean)
-                          .join(" · ") || "Not assigned"
+                    Year level
+                    <select
+                      value={profileForm.yr_id}
+                      onChange={(event) =>
+                        setProfileForm((current) => ({
+                          ...current,
+                          yr_id: event.target.value,
+                          section_id: "",
+                        }))
                       }
-                      readOnly
-                    />
+                      disabled={savingProfile || profileYearOptions.length === 0}
+                    >
+                      <option value="">Select year level</option>
+                      {profileYearOptions.map(([yearId, yearName]) => (
+                        <option key={yearId} value={yearId}>
+                          {yearName}
+                        </option>
+                      ))}
+                    </select>
+                    {profileYearOptions.length === 0 && (
+                      <small className="student-profile-help">
+                        Year and section options are unavailable. Run the
+                        pending database migrations and refresh this page.
+                      </small>
+                    )}
+                  </label>
+                  <label>
+                    Section
+                    <select
+                      value={profileForm.section_id}
+                      onChange={(event) =>
+                        setProfileForm((current) => ({
+                          ...current,
+                          section_id: event.target.value,
+                        }))
+                      }
+                      disabled={
+                        savingProfile ||
+                        !profileForm.yr_id ||
+                        profileSectionOptions.length === 0
+                      }
+                    >
+                      <option value="">Select section</option>
+                      {profileSectionOptions.map((option) => (
+                        <option
+                          key={option.section_id}
+                          value={option.section_id}
+                        >
+                          {option.section_name}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                 </div>
                 <div className="student-profile-actions">

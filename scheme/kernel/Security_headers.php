@@ -65,6 +65,7 @@ class Security_headers
         'coop'               => 'same-origin',   // '' to skip (e.g. OAuth popups)
 
         'api_max_body'       => 1048576,
+        'api_max_body_by_path' => [],
 
         'cors' => [
             // exact origins. Leave empty to fall back to config_item('allow_origin')
@@ -117,6 +118,23 @@ class Security_headers
      */
     public function max_body()
     {
+        $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+        $pathLimits = $this->config['api_max_body_by_path'];
+        if (is_string($requestPath) && is_array($pathLimits)) {
+            foreach ($pathLimits as $path => $limit) {
+                $path = '/' . trim((string) $path, '/');
+                if (
+                    $path !== '/' &&
+                    (
+                        $requestPath === $path ||
+                        substr($requestPath, -strlen($path)) === $path
+                    )
+                ) {
+                    return (int) $limit;
+                }
+            }
+        }
+
         return (int) $this->config['api_max_body'];
     }
 

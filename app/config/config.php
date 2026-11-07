@@ -370,12 +370,12 @@ $config['security_headers'] = [
     'csp_enabled' => false,
 
     // ── CSP sources ──
-    'script_src'  => ['https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com'],
+    'script_src'  => ['https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com', 'https://accounts.google.com'],
     'style_src'   => ['https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
     'font_src'    => ['https://fonts.gstatic.com'],
     'img_src'     => [],
-    'connect_src' => [],
-    'frame_src'   => [],
+    'connect_src' => ['https://accounts.google.com'],
+    'frame_src'   => ['https://accounts.google.com'],
     
     // ── CSP rollout ──
     'csp_report_only' => false,
@@ -397,6 +397,10 @@ $config['security_headers'] = [
     'coop'               => 'same-origin',
 
     // ── API ──
+    'api_max_body_by_path' => [
+        '/api/admin/profile/avatar' => 2010 * 1024 * 1024,
+        '/api/student/profile/avatar' => 2010 * 1024 * 1024,
+    ],
     'cors' => [
         'allowed_origins' => [
             'http://localhost:5173',

@@ -17,6 +17,11 @@
 }
 
 .admin-sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    flex-shrink: 0;
+    overflow-y: auto;
     width: 250px;
     min-width: 250px;
     display: flex;
@@ -34,16 +39,13 @@
 }
 
 .admin-brand-logo {
-    display: grid;
-    place-items: center;
+    display: block;
     width: 43px;
     height: 43px;
     flex-shrink: 0;
-    border-radius: 13px;
-    background: #32a66a;
-    color: white;
-    font-size: 15px;
-    font-weight: 800;
+    border-radius: 50%;
+    background: #fff;
+    object-fit: cover;
 }
 
 .admin-brand h2 {
@@ -429,6 +431,7 @@
 
 .announcements-filters input:focus,
 .announcements-form-group input:focus,
+.announcements-form-group select:focus,
 .announcements-form-group textarea:focus {
     border-color: #47a96f;
     box-shadow: 0 0 0 3px rgb(52 163 97 / 10%);
@@ -707,6 +710,7 @@
 }
 
 .announcements-form-group input,
+.announcements-form-group select,
 .announcements-form-group textarea {
     width: 100%;
     padding: 12px 13px;
@@ -793,6 +797,9 @@
     }
 
     .admin-sidebar {
+        position: static;
+        height: auto;
+        overflow-y: visible;
         width: 100%;
         min-width: 0;
         padding: 15px;

@@ -20,6 +20,13 @@
     RewriteRule ^(.*)$ index.php/$1 [L]
 </IfModule>
 
+<IfModule php_module>
+    php_value upload_max_filesize 2000M
+    php_value post_max_size 2010M
+    php_value max_input_time 1800
+    php_value max_execution_time 300
+</IfModule>
+
 <FilesMatch "^(\.env|composer\.(json|lock)|package\.json|package-lock\.json|\.git)">
     Require all denied
 </FilesMatch>

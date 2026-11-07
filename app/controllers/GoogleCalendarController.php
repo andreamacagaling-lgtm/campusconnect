@@ -73,9 +73,9 @@ class GoogleCalendarController extends Controller
                 'SELECT event_id, dept_id, title, description, venue,
                         start_datetime, end_datetime, status
                  FROM events
-                 WHERE dept_id = ?
+                 WHERE dept_id = ? AND approval_status = ?
                  ORDER BY start_datetime ASC',
-                [$departmentId]
+                [$departmentId, 'approved']
             )->fetchAll(PDO::FETCH_ASSOC);
 
             $results = [];
@@ -147,7 +147,7 @@ class GoogleCalendarController extends Controller
 
         try {
             $result = $this->db->raw(
-                'SELECT user_id, role, dept_id, status
+                'SELECT user_id, role, admin_type, dept_id, status
                  FROM users
                  WHERE user_id = ?
                  LIMIT 1',
@@ -175,7 +175,10 @@ class GoogleCalendarController extends Controller
             return null;
         }
 
-        if ($user['role'] !== 'admin') {
+        if (
+            $user['role'] !== 'admin' ||
+            $user['admin_type'] === 'organization'
+        ) {
             $this->api->respond_error(
                 'Admin access required.',
                 403

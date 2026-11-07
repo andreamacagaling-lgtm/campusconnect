@@ -15,8 +15,27 @@ $router->get('status', 'MigrationController::status');
 // Authentication Routes
 $router->post('api/auth/register', 'AuthController::register');
 $router->post('api/auth/login', 'AuthController::login');
+$router->post('api/auth/google', 'AuthController::google_login');
 $router->get('api/auth/departments', 'AuthController::departments');
 $router->get('api/auth/me', 'AuthController::me');
+
+// Organization administrator accounts (USG only)
+$router->get(
+    'api/admin/organization-accounts',
+    'OrganizationAdminController::index'
+);
+$router->post(
+    'api/admin/organization-accounts',
+    'OrganizationAdminController::create'
+);
+$router->put(
+    'api/admin/organization-accounts/{id}/department',
+    'OrganizationAdminController::assign_department'
+);
+// Administrator profile
+$router->get('api/admin/profile', 'AdminProfileController::index');
+$router->put('api/admin/profile', 'AdminProfileController::update');
+$router->post('api/admin/profile/avatar', 'AdminProfileController::upload_avatar');
 
 // Student portal
 $router->get('api/student/portal', 'StudentPortalController::index');
@@ -32,8 +51,24 @@ $router->put(
     'api/student/profile',
     'StudentPortalController::update_profile'
 );
+$router->post(
+    'api/student/profile/avatar',
+    'StudentPortalController::upload_avatar'
+);
 
 // Events Routes
+$router->get(
+    'api/events/pending-approvals',
+    'EventsController::pending_approvals'
+);
+$router->post(
+    'api/events/{id}/approve',
+    'EventsController::approve'
+);
+$router->post(
+    'api/events/{id}/reject',
+    'EventsController::reject'
+);
 $router->get('api/events', 'EventsController::index');
 $router->get('api/events/{id}', 'EventsController::index');
 $router->post('api/events', 'EventsController::create');
@@ -41,6 +76,14 @@ $router->put('api/events/{id}', 'EventsController::update');
 $router->delete('api/events/{id}', 'EventsController::delete');
 
 // Organizations Routes
+$router->get(
+    'api/organizations/membership-requests',
+    'OrganizationsController::membership_requests'
+);
+$router->put(
+    'api/organizations/membership-requests/{id}',
+    'OrganizationsController::update_membership_status'
+);
 $router->get('api/organizations', 'OrganizationsController::index');
 $router->get('api/organizations/{id}', 'OrganizationsController::index');
 $router->post('api/organizations', 'OrganizationsController::create');
@@ -53,6 +96,11 @@ $router->get('api/announcements/{id}', 'AnnouncementsController::index');
 $router->post('api/announcements', 'AnnouncementsController::create');
 $router->put('api/announcements/{id}', 'AnnouncementsController::update');
 $router->delete('api/announcements/{id}', 'AnnouncementsController::delete');
+
+$router->get(
+    'internal/send-event-start-reminders',
+    'EventNotificationsController::send_event_start_reminders'
+);
 
 
 

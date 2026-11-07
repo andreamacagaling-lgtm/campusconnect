@@ -202,6 +202,116 @@ If PHP needs a custom CA file, set `GOOGLE_CALENDAR_CA_BUNDLE` to its PEM path.
 Do not disable TLS verification. Event times use `GOOGLE_CALENDAR_TIMEZONE`,
 which defaults to `Asia/Manila`.
 
+### Google Sign-In
+
+Google sign-in verifies the Google ID token on the backend and only signs in
+an existing active CampusConnect account with the same verified email. New
+users should create an account using the registration page first.
+
+Migration `026_add_google_id_to_users` stores the verified Google account ID
+when a user signs in with Google. The verified Google email is saved to the
+user's `email` field. Existing users are linked on their next successful
+Google sign-in.
+
+Create an OAuth 2.0 **Web application** client ID in Google Cloud Console and
+add the frontend origin (for example, `http://localhost:5173`) to its
+authorized JavaScript origins. Set the same client ID as
+`GOOGLE_OAUTH_CLIENT_ID` in the backend `.env` and `VITE_GOOGLE_CLIENT_ID` in
+`frontend/.env`. Copy `frontend/.env.example` as a starting point, then restart
+the frontend and backend. Keep the two client ID values identical.
+
+## Event approval roles
+
+Campus-wide events submitted by USG, department events, and organization
+events are saved as pending until an OSSE administrator approves them.
+Approved events appear in the student portal's upcoming events and can be
+registered for. Editing an approved event sends it through approval again.
+OSSE accounts are limited to reviewing submissions; USG keeps the full-control
+dashboard and attendance tools.
+
+Students and administrators can upload a JPEG, PNG, or WebP profile photo (up
+to 2000 MB) from their profile page. The student photo appears with their event
+QR ticket and in the authorized event department's scan result; the QR code
+itself contains only the event registration token. Avatar API routes allow a
+2010 MB multipart request while other API routes retain the 1 MB request limit.
+
+For the PHP built-in server, restart it with
+`php -d upload_max_filesize=2000M -d post_max_size=2010M -d max_input_time=1800 -d max_execution_time=300 -S 127.0.0.1:3000 -t public`.
+Apache with mod_php is configured for the same upload limits in
+`public/.htaccess`; restart Apache after changing upload limits.
+
+Migration `019_seed_academic_profile_options` adds 1st–4th year levels and
+the department-specific sections used in student profiles. Students choose
+their year level and section under **My Profile**; both values are saved to
+`users.yr_id` and `users.section_id` and appear in attendance records. Run
+pending application migrations once to populate the lookup tables.
+
+Run the application migrations to add the `admin_type` and event approval
+columns. Existing unassigned administrator accounts are set to `usg`, while
+department-assigned administrator accounts are set to `department`. The OSSE
+account `campus.osse@gmail.com` is assigned the `osse` administrator type by
+the migration. To use a different existing administrator account instead, run
+this once with its email:
+
+```sql
+UPDATE users
+SET admin_type = 'osse'
+WHERE role = 'admin' AND email = 'admin@example.edu';
+```
+
+The OSSE account signs in through the regular login page and is redirected to
+the event approval queue.
+
+The public registration page is for student accounts; its department and
+student ID fields are not used for organization admins. A university admin
+registers one active organization admin account per department from
+**Organization Admins**. These accounts have `student_no` and `dept_id` set to
+`NULL`; `organization_dept_id` controls their department-specific dashboard
+and data access. Apply migrations `024_add_organization_admin_type` and
+`025_add_organization_admin_department` before using this feature. Department
+administrators no longer have organization management in their dashboard;
+they can still view their department's organizations when associating events.
+
+### USG event announcement notifications
+
+Before enabling this feature, apply migrations `020_add_event_link_to_announcements`
+and `021_add_event_start_email_deliveries` through the deployment's normal
+migration process. If that process applies every pending migration, check the
+pending migrations first and run only those intended for the target database.
+
+When creating an event-linked announcement, USG admins can select an approved
+upcoming campus-wide event and department admins can select an approved
+upcoming event from their department. Eligible active students who have not
+registered receive an email when registration opens; the announcement also
+appears in the student portal. Registered students receive a reminder when
+their event starts. Announcements without an event link do not send event
+emails.
+
+Each new announcement is also emailed to active users with a registered email
+address. This includes existing accounts that have not yet linked a Google ID.
+Configure `MAIL_USERNAME` and `MAIL_PASSWORD` in the backend `.env` with a Gmail
+account and its app password. Keep these credentials out of source control.
+The announcement remains published if email delivery fails; the API reports
+the delivery result.
+
+Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`,
+`SMTP_ENCRYPTION` (`tls` for port 587 or `ssl` for port 465),
+`SMTP_FROM_EMAIL`, and optionally `SMTP_FROM_NAME` in the backend `.env`.
+Set `STUDENT_PORTAL_URL` to the frontend's Events page URL. Use an SMTP
+credential created for the app, keep it out of source control, and ensure the
+sender address is authorized by the mail provider.
+
+Schedule `php lava events:send-start-reminders` to run every minute. On
+Windows, create a Task Scheduler task that runs `php.exe` with
+`C:\path\to\campusconnect\lava events:send-start-reminders` as its arguments,
+repeating every minute with the project directory as the working directory.
+On Linux, add `* * * * * cd /path/to/campusconnect && php lava events:send-start-reminders`
+to the crontab. The job only runs from the CLI, records deliveries to prevent
+repeat reminders, and retries temporary SMTP failures up to five times.
+Registration-open email is sent when the admin publishes the linked event
+announcement; if delivery fails, the announcement remains visible in the
+portal and the admin receives a delivery warning.
+
 ---
 
 ## Building a REST API

@@ -2,10 +2,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useLocation, useNavigate } from "react-router-dom";
+import EventImageUpload from "./EventImageUpload";
 import "./CCSAdmin.css";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:3000";
+  import.meta.env.VITE_API_BASE_URL || "";
 
 const DEPARTMENT_ID = 1;
 const DEPARTMENT_CODE = "CCS";
@@ -28,6 +29,7 @@ const CATEGORIES = [
 
 const EMPTY_FORM = {
   category_id: "",
+  org_id: "",
   title: "",
   description: "",
   venue: "",
@@ -82,6 +84,7 @@ function formatDate(value) {
   return date.toLocaleString("en-PH", {
     dateStyle: "medium",
     timeStyle: "short",
+    hour12: true,
   });
 }
 
@@ -118,7 +121,7 @@ function AdminSidebar({
   return (
     <aside className="ccs-admin-sidebar">
       <div className="ccs-admin-brand">
-        <div className="ccs-admin-brand-icon">C</div>
+        <img className="ccs-admin-brand-icon" src="/images/msu-seal.png" alt="" />
         <div>
           <strong>CampusConnect</strong>
           <span>{departmentCode} ADMIN PORTAL</span>
@@ -207,6 +210,7 @@ export default function CCSAdmin() {
   const fullNavigation = true;
 
   const [events, setEvents] = useState([]);
+  const [organizations, setOrganizations] = useState([]);
   const [calendarMonth, setCalendarMonth] = useState(
     () => new Date(new Date().getFullYear(), new Date().getMonth(), 1)
   );
@@ -220,6 +224,7 @@ export default function CCSAdmin() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [imageFile, setImageFile] = useState(null);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceError, setAttendanceError] = useState("");
@@ -237,6 +242,7 @@ export default function CCSAdmin() {
 
   const isDepartmentAdmin =
     user?.role === "admin" &&
+    user?.admin_type === "department" &&
     Number(user?.dept_id) === departmentId;
 
   const fetchEvents = useCallback(async () => {
@@ -281,6 +287,26 @@ export default function CCSAdmin() {
     }
   }, [departmentCode, departmentId]);
 
+  const fetchOrganizations = useCallback(async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/organizations`, {
+        headers: getHeaders(),
+      });
+      const records = response.data?.data;
+      if (!Array.isArray(records)) {
+        throw new Error("Organizations were not returned by the server.");
+      }
+      setOrganizations(records);
+    } catch (requestError) {
+      setError(
+        responseMessage(
+          requestError,
+          "Unable to load department organizations."
+        )
+      );
+    }
+  }, []);
+
   const fetchAttendance = useCallback(async () => {
     setAttendanceLoading(true);
     setAttendanceError("");
@@ -288,7 +314,6 @@ export default function CCSAdmin() {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/attendance`, {
         headers: getHeaders(),
-        params: { dept_id: departmentId },
       });
       const records = response.data?.data;
 
@@ -304,7 +329,7 @@ export default function CCSAdmin() {
     } finally {
       setAttendanceLoading(false);
     }
-  }, [departmentId]);
+  }, []);
 
   useEffect(() => {
     if (!getToken()) {
@@ -317,7 +342,8 @@ export default function CCSAdmin() {
     }
 
     void Promise.resolve().then(fetchEvents);
-  }, [departmentCode, fetchEvents, isDepartmentAdmin, navigate]);
+    void Promise.resolve().then(fetchOrganizations);
+  }, [departmentCode, fetchEvents, fetchOrganizations, isDepartmentAdmin, navigate]);
 
   useEffect(() => {
     if (fullNavigation && activeSection === "attendance" && isDepartmentAdmin) {
@@ -334,7 +360,11 @@ export default function CCSAdmin() {
         event.description,
         event.venue,
         event.status,
+        event.approval_status,
         event.category_name,
+        organizations.find(
+          (organization) => Number(organization.org_id) === Number(event.org_id)
+        )?.org_name,
       ].some((value) =>
         String(value || "").toLowerCase().includes(term)
       );
@@ -345,7 +375,7 @@ export default function CCSAdmin() {
 
       return matchesSearch && matchesStatus;
     });
-  }, [events, search, statusFilter]);
+  }, [events, organizations, search, statusFilter]);
 
   const stats = useMemo(
     () => ({
@@ -411,6 +441,7 @@ export default function CCSAdmin() {
 
   function openAddModal() {
     setEditingId(null);
+    setImageFile(null);
     setForm({ ...EMPTY_FORM });
     setError("");
     setNotice("");
@@ -419,9 +450,11 @@ export default function CCSAdmin() {
 
   function openEditModal(event) {
     setEditingId(event.event_id);
+    setImageFile(null);
 
     setForm({
       category_id: String(event.category_id || ""),
+      org_id: String(event.org_id || ""),
       title: event.title || "",
       description: event.description || "",
       venue: event.venue || "",
@@ -441,6 +474,7 @@ export default function CCSAdmin() {
 
     setModalOpen(false);
     setEditingId(null);
+    setImageFile(null);
     setForm({ ...EMPTY_FORM });
   }
 
@@ -484,6 +518,7 @@ export default function CCSAdmin() {
 
     const payload = {
       category_id: Number(form.category_id),
+      org_id: form.org_id ? Number(form.org_id) : null,
       title: form.title.trim(),
       description: form.description.trim(),
       venue: form.venue.trim(),
@@ -513,10 +548,23 @@ export default function CCSAdmin() {
         }
       } else {
         // Backend assigns dept_id from the authenticated department admin.
+        const formData = new FormData();
+        Object.entries(payload).forEach(([key, value]) => {
+          formData.append(key, value === null ? "" : String(value));
+        });
+        if (imageFile) {
+          formData.append("image_file", imageFile);
+        }
+
         const response = await axios.post(
           EVENTS_API,
-          payload,
-          { headers: getHeaders() }
+          formData,
+          {
+            headers: {
+              ...getHeaders(),
+              "Content-Type": "multipart/form-data",
+            },
+          }
         );
 
         setNotice(response.data?.message || "Event created successfully.");
@@ -529,6 +577,7 @@ export default function CCSAdmin() {
 
       setModalOpen(false);
       setEditingId(null);
+      setImageFile(null);
       setForm({ ...EMPTY_FORM });
 
       await fetchEvents();
@@ -785,6 +834,7 @@ export default function CCSAdmin() {
                   <thead>
                     <tr>
                       <th>Student</th>
+                      <th>Student Department</th>
                       <th>Event</th>
                       <th>Year / Section</th>
                       <th>Status</th>
@@ -794,13 +844,13 @@ export default function CCSAdmin() {
                   <tbody>
                     {attendanceLoading ? (
                       <tr>
-                        <td colSpan="5" className="ccs-admin-empty">
+                        <td colSpan="6" className="ccs-admin-empty">
                           Loading attendance records...
                         </td>
                       </tr>
                     ) : attendanceRecords.length === 0 ? (
                       <tr>
-                        <td colSpan="5" className="ccs-admin-empty">
+                        <td colSpan="6" className="ccs-admin-empty">
                           No attendance records found for this department.
                         </td>
                       </tr>
@@ -813,6 +863,7 @@ export default function CCSAdmin() {
                               {record.student_no || record.email || "—"}
                             </span>
                           </td>
+                          <td>{record.dept_name || "Unassigned"}</td>
                           <td>{record.event_title || "—"}</td>
                           <td>
                             {[record.yr_name, record.section_name]
@@ -1077,6 +1128,7 @@ export default function CCSAdmin() {
                     <th>Venue</th>
                     <th>Schedule</th>
                     <th>Status</th>
+                    <th>Approval</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -1084,13 +1136,13 @@ export default function CCSAdmin() {
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="6" className="ccs-admin-empty">
+                      <td colSpan="7" className="ccs-admin-empty">
                         Loading events from database...
                       </td>
                     </tr>
                   ) : filteredEvents.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="ccs-admin-empty">
+                      <td colSpan="7" className="ccs-admin-empty">
                         {events.length === 0
                           ? `No ${departmentCode} events have been saved yet. Select Add Event to create your first event.`
                           : "No events match your search or status filter."}
@@ -1115,6 +1167,14 @@ export default function CCSAdmin() {
 
                             <div>
                               <strong>{event.title}</strong>
+                              {event.org_id && (
+                                <span>
+                                  {organizations.find(
+                                    (organization) =>
+                                      Number(organization.org_id) === Number(event.org_id)
+                                  )?.org_name || "Organization event"}
+                                </span>
+                              )}
                               <span>
                                 ID: {event.event_id}
                               </span>
@@ -1148,6 +1208,12 @@ export default function CCSAdmin() {
                             className={`ccs-admin-status ${event.status}`}
                           >
                             {event.status}
+                          </span>
+                        </td>
+
+                        <td>
+                          <span className={`ccs-admin-status ${event.approval_status || "approved"}`}>
+                            {event.approval_status || "approved"}
                           </span>
                         </td>
 
@@ -1254,6 +1320,22 @@ export default function CCSAdmin() {
                 </label>
 
                 <label className="ccs-admin-field">
+                  Organization
+                  <select
+                    name="org_id"
+                    value={form.org_id}
+                    onChange={handleChange}
+                  >
+                    <option value="">Department event</option>
+                    {organizations.filter((organization) => organization.status === "active").map((organization) => (
+                      <option key={organization.org_id} value={organization.org_id}>
+                        {organization.org_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="ccs-admin-field">
                   Status *
                   <select
                     name="status"
@@ -1292,21 +1374,20 @@ export default function CCSAdmin() {
                   />
                 </label>
 
-                <label className="ccs-admin-field full">
-                  Image URL
-                  <input
-                    type="url"
-                    name="image"
-                    value={form.image}
-                    onChange={handleChange}
-                    placeholder="https://example.com/event-image.jpg"
+                {!editingId && (
+                  <EventImageUpload
+                    className="ccs-admin-field full"
+                    file={imageFile}
+                    onChange={setImageFile}
+                    disabled={saving}
                   />
-                </label>
+                )}
 
                 <label className="ccs-admin-field">
                   Start Date & Time *
                   <input
                     type="datetime-local"
+                    lang="en-US"
                     name="start_datetime"
                     value={form.start_datetime}
                     onChange={handleChange}
@@ -1318,6 +1399,7 @@ export default function CCSAdmin() {
                   End Date & Time *
                   <input
                     type="datetime-local"
+                    lang="en-US"
                     name="end_datetime"
                     value={form.end_datetime}
                     onChange={handleChange}

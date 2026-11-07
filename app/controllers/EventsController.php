@@ -8,8 +8,8 @@ class EventsController extends Controller
     {
         parent::__construct();
 
-        $this->api->require_library('api');
-        $this->api->database();
+        $this->call->library('api');
+        $this->call->database();
         $this->call->model('EventsModel');
     }
 
@@ -84,6 +84,205 @@ class EventsController extends Controller
         }
     }
 
+    public function pending_approvals()
+    {
+        $this->api->require_method('GET');
+
+        $claims = $this->api->require_jwt();
+        $user = $this->require_osse($claims);
+
+        if ($user === null) {
+            return;
+        }
+
+        try {
+            $events = $this->db->raw(
+                'SELECT e.*, c.category_name, d.dept_name, o.org_name,
+                        u.full_name AS submitted_by
+                 FROM events e
+                 LEFT JOIN event_categories c
+                    ON c.category_id = e.category_id
+                 LEFT JOIN departments d ON d.dept_id = e.dept_id
+                 LEFT JOIN organizations o ON o.org_id = e.org_id
+                 LEFT JOIN users u ON u.user_id = e.created_by
+                 WHERE e.approval_status = ?
+                 ORDER BY e.created_at ASC',
+                ['pending']
+            )->fetchAll(PDO::FETCH_ASSOC);
+
+            $this->api->respond([
+                'success' => true,
+                'data' => $events
+            ], 200);
+        } catch (Throwable $e) {
+            error_log(
+                'EventsController pending_approvals: ' . $e->getMessage()
+            );
+            $this->api->respond_error(
+                'Unable to retrieve pending event approvals.',
+                500
+            );
+        }
+    }
+
+    public function approve($id = null)
+    {
+        $this->api->require_method('POST');
+
+        $claims = $this->api->require_jwt();
+        $user = $this->require_osse($claims);
+
+        if ($user === null) {
+            return;
+        }
+
+        if (!$this->valid_id($id)) {
+            $this->api->respond_error('A valid event ID is required.', 400);
+            return;
+        }
+
+        $event = $this->EventsModel->find((int) $id);
+
+        if (!$event) {
+            $this->api->respond_error('Event not found.', 404);
+            return;
+        }
+
+        if ($this->get_value($event, 'approval_status') !== 'pending') {
+            $this->api->respond_error(
+                'Only pending events can be approved.',
+                409
+            );
+            return;
+        }
+
+        try {
+            $approvalResult = $this->db->raw(
+                'UPDATE events
+                 SET approval_status = ?, reviewed_by = ?, reviewed_at = NOW(),
+                     approval_note = NULL
+                 WHERE event_id = ? AND approval_status = ?',
+                ['approved', (int) $user['user_id'], (int) $id, 'pending']
+            );
+
+            if (!$approvalResult || $approvalResult->rowCount() !== 1) {
+                $this->api->respond_error(
+                    'This event has already been reviewed.',
+                    409
+                );
+                return;
+            }
+
+            $approvedEvent = $this->db->raw(
+                'SELECT event_id, dept_id, title, description, venue,
+                        start_datetime, end_datetime, status
+                 FROM events
+                 WHERE event_id = ? AND approval_status = ?',
+                [(int) $id, 'approved']
+            )->fetch(PDO::FETCH_ASSOC);
+
+            if (!$approvedEvent) {
+                throw new RuntimeException(
+                    'Approved event could not be loaded for calendar sync.'
+                );
+            }
+
+            $calendarSync = $approvedEvent['dept_id'] === null
+                ? null
+                : $this->sync_google_calendar_event($approvedEvent);
+
+            $this->api->respond([
+                'success' => true,
+                'message' => 'Event approved and published to upcoming events.',
+                'google_calendar_sync' => $calendarSync
+            ], 200);
+        } catch (Throwable $e) {
+            error_log('EventsController approve: ' . $e->getMessage());
+            $this->api->respond_error('Unable to approve this event.', 500);
+        }
+    }
+
+    public function reject($id = null)
+    {
+        $this->api->require_method('POST');
+
+        $claims = $this->api->require_jwt();
+        $user = $this->require_osse($claims);
+
+        if ($user === null) {
+            return;
+        }
+
+        if (!$this->valid_id($id)) {
+            $this->api->respond_error('A valid event ID is required.', 400);
+            return;
+        }
+
+        $event = $this->EventsModel->find((int) $id);
+
+        if (!$event) {
+            $this->api->respond_error('Event not found.', 404);
+            return;
+        }
+
+        if ($this->get_value($event, 'approval_status') !== 'pending') {
+            $this->api->respond_error(
+                'Only pending events can be rejected.',
+                409
+            );
+            return;
+        }
+
+        $body = $this->api->body();
+
+        if (!is_array($body)) {
+            $this->api->respond_error('Invalid request body.', 400);
+            return;
+        }
+
+        $note = trim((string) ($body['approval_note'] ?? ''));
+
+        if (strlen($note) > 1000) {
+            $this->api->respond_error(
+                'The rejection note cannot exceed 1000 characters.',
+                422
+            );
+            return;
+        }
+
+        try {
+            $rejectionResult = $this->db->raw(
+                'UPDATE events
+                 SET approval_status = ?, reviewed_by = ?, reviewed_at = NOW(),
+                     approval_note = ?
+                 WHERE event_id = ? AND approval_status = ?',
+                [
+                    'rejected',
+                    (int) $user['user_id'],
+                    $note !== '' ? $note : null,
+                    (int) $id,
+                    'pending'
+                ]
+            );
+
+            if (!$rejectionResult || $rejectionResult->rowCount() !== 1) {
+                $this->api->respond_error(
+                    'This event has already been reviewed.',
+                    409
+                );
+                return;
+            }
+
+            $this->api->respond([
+                'success' => true,
+                'message' => 'Event rejected.'
+            ], 200);
+        } catch (Throwable $e) {
+            error_log('EventsController reject: ' . $e->getMessage());
+            $this->api->respond_error('Unable to reject this event.', 500);
+        }
+    }
+
     /**
      * POST /api/events
      */
@@ -95,6 +294,14 @@ class EventsController extends Controller
         $user = $this->require_admin($claims);
 
         if ($user === null) {
+            return;
+        }
+
+        if ($user['admin_type'] === 'osse') {
+            $this->api->respond_error(
+                'OSSE accounts can review events but cannot submit them.',
+                403
+            );
             return;
         }
 
@@ -150,6 +357,18 @@ class EventsController extends Controller
             return;
         }
 
+        $requestedOrgId = $this->validate_department_id(
+            $body['org_id'] ?? null
+        );
+
+        if ($requestedOrgId === false) {
+            $this->api->respond_error(
+                'Organization ID must be a positive integer or null.',
+                422
+            );
+            return;
+        }
+
         // Department admins can only create events for their own department.
         if ($user['dept_id'] !== null) {
             if (
@@ -177,13 +396,46 @@ class EventsController extends Controller
             $deptId = null;
         }
 
+        if ($requestedOrgId !== null) {
+            if ($deptId === null) {
+                $this->api->respond_error(
+                    'Organization events must belong to a department.',
+                    422
+                );
+                return;
+            }
+
+            $organization = $this->db->raw(
+                'SELECT org_id
+                 FROM organizations
+                 WHERE org_id = ? AND dept_id = ? AND status = ?
+                 LIMIT 1',
+                [$requestedOrgId, $deptId, 'active']
+            )->fetch(PDO::FETCH_ASSOC);
+
+            if (!$organization) {
+                $this->api->respond_error(
+                    'Select an active organization in your department.',
+                    422
+                );
+                return;
+            }
+        }
+
+        $uploadedImagePath = $this->store_event_image();
+        if ($uploadedImagePath === false) {
+            return;
+        }
+
         $data = [
             'category_id' => $categoryId,
             'dept_id' => $deptId,
+            'org_id' => $requestedOrgId,
             'title' => $title,
             'description' => $description,
             'venue' => $venue,
-            'image' => trim((string) ($body['image'] ?? '')) ?: null,
+            'image' => $uploadedImagePath
+                ?? (trim((string) ($body['image'] ?? '')) ?: null),
             'start_datetime' => date(
                 'Y-m-d H:i:s',
                 strtotime($startDatetime)
@@ -193,6 +445,7 @@ class EventsController extends Controller
                 strtotime($endDatetime)
             ),
             'status' => $status,
+            'approval_status' => 'pending',
             'created_by' => (int) $user['user_id']
         ];
 
@@ -201,6 +454,7 @@ class EventsController extends Controller
 
             if (!$eventId) {
                 error_log('EventsController create: insert returned false.');
+                $this->remove_uploaded_event_image($uploadedImagePath);
 
                 $this->api->respond_error(
                     'Failed to create event.',
@@ -209,22 +463,14 @@ class EventsController extends Controller
                 return;
             }
 
-            $calendarSync = $this->sync_google_calendar_event(
-                array_merge($data, [
-                    'event_id' => (int) $eventId
-                ])
-            );
-
             $this->api->respond([
                 'success' => true,
-                'message' => $calendarSync['success']
-                    ? 'Event created successfully.'
-                    : 'Event created, but Google Calendar sync failed.',
-                'event_id' => $eventId,
-                'google_calendar_sync' => $calendarSync
+                'message' => 'Event submitted to OSSE for approval.',
+                'event_id' => $eventId
             ], 201);
 
         } catch (Throwable $e) {
+            $this->remove_uploaded_event_image($uploadedImagePath);
             error_log('EventsController create: ' . $e->getMessage());
 
             $this->api->respond_error(
@@ -329,6 +575,7 @@ class EventsController extends Controller
             }
 
             $deptId = null;
+            $orgId = null;
         } else {
             if (
                 $existingDeptId === null ||
@@ -362,11 +609,43 @@ class EventsController extends Controller
             }
 
             $deptId = (int) $user['dept_id'];
+            $orgId = $this->validate_department_id(
+                array_key_exists('org_id', $body)
+                    ? $body['org_id']
+                    : $this->get_value($existingEvent, 'org_id')
+            );
+
+            if ($orgId === false) {
+                $this->api->respond_error(
+                    'Organization ID must be a positive integer or null.',
+                    422
+                );
+                return;
+            }
+
+            if ($orgId !== null) {
+                $organization = $this->db->raw(
+                    'SELECT org_id
+                     FROM organizations
+                     WHERE org_id = ? AND dept_id = ? AND status = ?
+                     LIMIT 1',
+                    [$orgId, $deptId, 'active']
+                )->fetch(PDO::FETCH_ASSOC);
+
+                if (!$organization) {
+                    $this->api->respond_error(
+                        'Select an active organization in your department.',
+                        422
+                    );
+                    return;
+                }
+            }
         }
 
         $data = [
             'category_id' => $categoryId,
             'dept_id' => $deptId,
+            'org_id' => $orgId,
             'title' => $title,
             'description' => $description,
             'venue' => $venue,
@@ -379,7 +658,11 @@ class EventsController extends Controller
                 'Y-m-d H:i:s',
                 strtotime($endDatetime)
             ),
-            'status' => $status
+            'status' => $status,
+            'approval_status' => 'pending',
+            'approval_note' => null,
+            'reviewed_by' => null,
+            'reviewed_at' => null
         ];
 
         try {
@@ -393,18 +676,9 @@ class EventsController extends Controller
                 return;
             }
 
-            $calendarSync = $this->sync_google_calendar_event(
-                array_merge($data, [
-                    'event_id' => (int) $id
-                ])
-            );
-
             $this->api->respond([
                 'success' => true,
-                'message' => $calendarSync['success']
-                    ? 'Event updated successfully.'
-                    : 'Event updated, but Google Calendar sync failed.',
-                'google_calendar_sync' => $calendarSync
+                'message' => 'Event updated and resubmitted to OSSE for approval.'
             ], 200);
 
         } catch (Throwable $e) {
@@ -525,6 +799,14 @@ class EventsController extends Controller
             return;
         }
 
+        if ($this->get_value($event, 'approval_status') !== 'approved') {
+            $this->api->respond_error(
+                'This event is not available for registration.',
+                409
+            );
+            return;
+        }
+
         try {
             // 1. Suriin kung rehistrado na ba ang user
             $existingReg = $this->db->raw(
@@ -579,6 +861,14 @@ class EventsController extends Controller
         $adminUser = $this->require_admin($claims);
 
         if ($adminUser === null) {
+            return;
+        }
+
+        if ($adminUser['admin_type'] === 'osse') {
+            $this->api->respond_error(
+                'OSSE accounts cannot manage attendance records.',
+                403
+            );
             return;
         }
 
@@ -642,6 +932,14 @@ class EventsController extends Controller
             return;
         }
 
+        if ($adminUser['admin_type'] === 'osse') {
+            $this->api->respond_error(
+                'OSSE accounts cannot manage attendance records.',
+                403
+            );
+            return;
+        }
+
         $body = $this->api->body();
         $regId = $body['reg_id'] ?? null;
 
@@ -694,7 +992,7 @@ class EventsController extends Controller
 
         try {
             $result = $this->db->raw(
-                'SELECT user_id, role, dept_id
+                'SELECT user_id, role, admin_type, dept_id
                  FROM users
                  WHERE user_id = ?
                  LIMIT 1',
@@ -712,6 +1010,7 @@ class EventsController extends Controller
             }
 
             $user['user_id'] = (int) $user['user_id'];
+            $user['admin_type'] = $user['admin_type'] ?? 'department';
             $user['dept_id'] = (
                 $user['dept_id'] === null ||
                 $user['dept_id'] === ''
@@ -741,7 +1040,10 @@ class EventsController extends Controller
             return null;
         }
 
-        if ($user['role'] !== 'admin') {
+        if (
+            $user['role'] !== 'admin' ||
+            $user['admin_type'] === 'organization'
+        ) {
             $this->api->respond_error(
                 'Admin access required.',
                 403
@@ -752,8 +1054,38 @@ class EventsController extends Controller
         return $user;
     }
 
+    private function require_osse($claims)
+    {
+        $user = $this->require_admin($claims);
+
+        if ($user === null) {
+            return null;
+        }
+
+        if ($user['admin_type'] !== 'osse') {
+            $this->api->respond_error(
+                'OSSE event-approval access required.',
+                403
+            );
+            return null;
+        }
+
+        return $user;
+    }
+
     private function can_view_event($user, $event)
     {
+        if ($user['role'] === 'admin' && $user['admin_type'] === 'osse') {
+            return true;
+        }
+
+        if (
+            $user['role'] !== 'admin' &&
+            $this->get_value($event, 'approval_status') !== 'approved'
+        ) {
+            return false;
+        }
+
         $eventDeptId = $this->get_value($event, 'dept_id');
 
         if ($eventDeptId === null || $eventDeptId === '') {
@@ -766,7 +1098,10 @@ class EventsController extends Controller
 
     private function can_manage_event($user, $event)
     {
-        if ($user['role'] !== 'admin') {
+        if (
+            $user['role'] !== 'admin' ||
+            $user['admin_type'] === 'osse'
+        ) {
             return false;
         }
 
@@ -822,6 +1157,126 @@ class EventsController extends Controller
         }
 
         return null;
+    }
+
+    private function store_event_image()
+    {
+        $upload = $_FILES['image_file'] ?? null;
+        if ($upload === null) {
+            return null;
+        }
+
+        if (!is_array($upload) || !isset($upload['error'])) {
+            $this->api->respond_error('Choose a valid event photo.', 422);
+            return false;
+        }
+
+        if ($upload['error'] !== UPLOAD_ERR_OK) {
+            $this->api->respond_error(
+                $upload['error'] === UPLOAD_ERR_INI_SIZE ||
+                $upload['error'] === UPLOAD_ERR_FORM_SIZE
+                    ? 'Event photos must be 10 MB or smaller.'
+                    : 'The event photo could not be uploaded.',
+                422
+            );
+            return false;
+        }
+
+        if (
+            !isset($upload['tmp_name'], $upload['size']) ||
+            !is_string($upload['tmp_name']) ||
+            !is_uploaded_file($upload['tmp_name']) ||
+            $upload['size'] < 1 ||
+            $upload['size'] > 10 * 1024 * 1024
+        ) {
+            $this->api->respond_error(
+                'Choose a valid event photo that is 10 MB or smaller.',
+                422
+            );
+            return false;
+        }
+
+        $imageInfo = @getimagesize($upload['tmp_name']);
+        $fileInfo = new finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $fileInfo->file($upload['tmp_name']);
+        $extensions = [
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp'
+        ];
+
+        if (
+            !$imageInfo ||
+            !is_string($mimeType) ||
+            !isset($extensions[$mimeType]) ||
+            $imageInfo['mime'] !== $mimeType ||
+            $imageInfo[0] < 1 ||
+            $imageInfo[1] < 1 ||
+            $imageInfo[0] > 8000 ||
+            $imageInfo[1] > 8000 ||
+            $imageInfo[0] * $imageInfo[1] > 12000000
+        ) {
+            $this->api->respond_error(
+                'Use a valid JPEG, PNG, or WebP event photo.',
+                422
+            );
+            return false;
+        }
+
+        $imageDirectory = ROOT_DIR . 'public/uploads/events';
+        if (
+            !is_dir($imageDirectory) &&
+            !mkdir($imageDirectory, 0755, true) &&
+            !is_dir($imageDirectory)
+        ) {
+            error_log(
+                'EventsController store_event_image: Unable to create event image directory.'
+            );
+            $this->api->respond_error(
+                'Unable to save the event photo right now.',
+                500
+            );
+            return false;
+        }
+
+        $filename = bin2hex(random_bytes(16)) . '.' . $extensions[$mimeType];
+        $destination = $imageDirectory . DIRECTORY_SEPARATOR . $filename;
+        $imagePath = '/uploads/events/' . $filename;
+
+        if (!move_uploaded_file($upload['tmp_name'], $destination)) {
+            error_log(
+                'EventsController store_event_image: Unable to move uploaded photo.'
+            );
+            $this->api->respond_error(
+                'Unable to save the event photo right now.',
+                500
+            );
+            return false;
+        }
+
+        return $imagePath;
+    }
+
+    private function remove_uploaded_event_image($imagePath)
+    {
+        if (
+            !is_string($imagePath) ||
+            !preg_match(
+                '#^/uploads/events/([a-f0-9]{32}\.(?:jpg|png|webp))$#',
+                $imagePath,
+                $matches
+            )
+        ) {
+            return;
+        }
+
+        $imageFile = ROOT_DIR . 'public/uploads/events' .
+            DIRECTORY_SEPARATOR . $matches[1];
+        if (is_file($imageFile) && !unlink($imageFile)) {
+            error_log(
+                'EventsController remove_uploaded_event_image: Unable to remove event photo.'
+            );
+        }
     }
 
     private function validate_category_id($categoryId)

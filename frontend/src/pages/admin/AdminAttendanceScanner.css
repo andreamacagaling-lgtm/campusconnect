@@ -17,6 +17,23 @@
   font-weight: 800;
 }
 
+.admin-scanner-back {
+  margin: 0 0 18px;
+  padding: 8px 12px;
+  border: 1px solid #dce5de;
+  border-radius: 7px;
+  background: #fff;
+  color: #27663c;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.admin-scanner-back:hover {
+  background: #eff8f1;
+}
+
 .admin-scanner-container > p {
   margin: 8px 0 22px;
   color: #718176;
@@ -120,10 +137,24 @@
   font-size: 17px;
 }
 
+.admin-scanner-result {
+  display: grid;
+  width: 100%;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
+}
+
+.admin-scanner-result-details {
+  min-width: 0;
+  text-align: left;
+}
+
 .admin-scanner-avatar {
   width: 104px;
   height: 104px;
-  margin: 4px auto 10px;
+  margin: 4px 0 10px;
+  display: block;
   border: 3px solid #2b9b62;
   border-radius: 50%;
   background: #eaf7ef;
@@ -141,6 +172,7 @@
   color: #536157;
   font-size: 13px;
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .admin-scanner-actions {
@@ -199,6 +231,16 @@
   .admin-scanner-actions {
     width: 100%;
     flex-direction: column;
+  }
+
+  .admin-scanner-result {
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .admin-scanner-avatar {
+    width: 76px;
+    height: 76px;
   }
 
   .admin-scanner-button {

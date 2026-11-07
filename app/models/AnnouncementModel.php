@@ -13,7 +13,8 @@ class AnnouncementModel extends Model
     protected $fillable = [
         'title',
         'body',
-        'posted_by'
+        'posted_by',
+        'event_id'
     ];
 
     protected $guarded = [

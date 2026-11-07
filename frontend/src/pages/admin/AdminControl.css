@@ -26,15 +26,13 @@
 }
 
 .control-brand-mark {
-  display: grid;
+  display: block;
   width: 43px;
   height: 43px;
-  place-items: center;
-  border-radius: 12px;
-  background: #d9f99d;
-  color: #123c2b;
-  font-size: 13px;
-  font-weight: 900;
+  flex: 0 0 43px;
+  border-radius: 50%;
+  background: #fff;
+  object-fit: cover;
 }
 
 .control-brand strong,
@@ -111,6 +109,7 @@
 
 .control-avatar,
 .control-profile-avatar {
+  position: relative;
   display: grid;
   flex-shrink: 0;
   place-items: center;
@@ -118,6 +117,16 @@
   background: #d9f4e4;
   color: #17623c;
   font-weight: 800;
+  overflow: hidden;
+}
+
+.control-avatar img,
+.control-profile-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .control-avatar {
@@ -306,6 +315,33 @@
   font-size: 11px;
 }
 
+.control-attendance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.control-attendance-filter {
+  display: grid;
+  gap: 5px;
+  color: #718176;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.control-attendance-filter select {
+  min-width: 170px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid #d5e0d8;
+  border-radius: 7px;
+  background: #fff;
+  color: #314238;
+  font: inherit;
+}
+
 .control-panel-heading button,
 .control-denied button {
   min-height: 36px;
@@ -377,6 +413,243 @@
   text-align: center;
 }
 
+.control-events-view-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e8eee9;
+}
+
+.control-events-view-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.control-events-view-tabs button {
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #718176;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.control-events-view-tabs button.active {
+  border-color: #cce5d2;
+  background: #eaf7ef;
+  color: #216b43;
+}
+
+.control-events-view-bar > .control-event-refresh {
+  min-height: 36px;
+  padding: 8px 13px;
+  border: 0;
+  border-radius: 7px;
+  background: #216b43;
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.control-events-view-bar > .control-event-refresh:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.control-calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+  gap: 18px;
+}
+
+.control-calendar {
+  padding: 18px;
+}
+
+.control-calendar-heading,
+.control-calendar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.control-calendar-heading h2,
+.control-calendar-agenda-heading h2 {
+  margin: 0;
+  color: #213b2a;
+  font-size: 15px;
+}
+
+.control-calendar-heading p,
+.control-calendar-agenda-heading p {
+  margin: 6px 0 0;
+  color: #829086;
+  font-size: 11px;
+}
+
+.control-calendar-controls button {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid #d5e0d8;
+  border-radius: 7px;
+  background: #fff;
+  color: #216b43;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.control-calendar-month {
+  margin: 22px 0 12px;
+  color: #183e2c;
+  font-size: 17px;
+}
+
+.control-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-top: 1px solid #e8eee9;
+  border-left: 1px solid #e8eee9;
+}
+
+.control-calendar-weekday {
+  padding: 9px 4px;
+  background: #f8faf8;
+  color: #7a887e;
+  font-size: 9px;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.control-calendar-day {
+  display: flex;
+  min-width: 0;
+  min-height: 94px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 7px;
+  border: 0;
+  border-right: 1px solid #e8eee9;
+  border-bottom: 1px solid #e8eee9;
+  background: #fff;
+  color: #314238;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.control-calendar-day:hover,
+.control-calendar-day.selected {
+  background: #f0f8f2;
+}
+
+.control-calendar-day.today .control-calendar-day-number {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  place-items: center;
+  border-radius: 50%;
+  background: #216b43;
+  color: #fff;
+}
+
+.control-calendar-day.outside-month {
+  background: #fafbfa;
+  color: #aab4ad;
+}
+
+.control-calendar-day-number {
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.control-calendar-event,
+.control-calendar-more {
+  overflow: hidden;
+  padding: 3px 4px;
+  border-radius: 4px;
+  background: #eaf7ef;
+  color: #216b43;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.control-calendar-more {
+  background: transparent;
+  color: #718176;
+}
+
+.control-calendar-agenda-heading {
+  padding: 18px;
+  border-bottom: 1px solid #e8eee9;
+}
+
+.control-calendar-agenda-list {
+  display: grid;
+  gap: 1px;
+  background: #e8eee9;
+}
+
+.control-calendar-agenda-event {
+  padding: 15px 17px;
+  background: #fff;
+}
+
+.control-calendar-agenda-event h3 {
+  margin: 10px 0 7px;
+  color: #213b2a;
+  font-size: 13px;
+}
+
+.control-calendar-agenda-event p {
+  margin: 5px 0;
+  color: #718176;
+  font-size: 10px;
+}
+
+.control-calendar-agenda-event small {
+  display: block;
+  margin-top: 8px;
+  color: #829086;
+  font-size: 9px;
+  text-transform: capitalize;
+}
+
+.control-calendar-status {
+  display: inline-block;
+  padding: 4px 7px;
+  border-radius: 12px;
+  background: #eaf7ef;
+  color: #216b43;
+  font-size: 9px;
+  text-transform: capitalize;
+}
+
+.control-calendar-status.pending {
+  background: #fff5df;
+  color: #8a5b08;
+}
+
+.control-calendar-status.rejected {
+  background: #fff0f0;
+  color: #a42d2d;
+}
+
 .control-alert {
   margin-bottom: 18px;
   padding: 12px 14px;
@@ -387,10 +660,136 @@
   font-size: 12px;
 }
 
-.control-profile {
+.control-notice {
+  margin-bottom: 16px;
+  padding: 11px 14px;
+  border: 1px solid #cce5d2;
+  border-radius: 8px;
+  background: #eaf7ef;
+  color: #216b43;
+  font-size: 12px;
+}
+
+.control-event-form {
+  margin: 0;
+  padding: 18px;
+}
+
+.control-event-modal-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(10 28 18 / 62%);
+}
+
+.control-event-modal {
+  width: min(760px, 100%);
+  max-height: min(90vh, 900px);
+  overflow: auto;
+  border: 1px solid #dfe9e1;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgb(0 0 0 / 28%);
+}
+
+.control-event-modal-heading {
+  position: sticky;
+  z-index: 1;
+  top: 0;
   display: flex;
-  align-items: flex-start;
-  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  border-bottom: 1px solid #e8eee9;
+  background: #fff;
+}
+
+.control-event-modal-heading h2 {
+  margin: 0;
+  color: #183e2c;
+  font-size: 16px;
+}
+
+.control-event-modal-heading button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #dbe5dd;
+  border-radius: 50%;
+  background: #fff;
+  color: #526157;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.control-event-modal-heading button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.control-event-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.control-event-grid label {
+  display: grid;
+  gap: 6px;
+  color: #4c5c51;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.control-event-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.control-event-grid input,
+.control-event-grid select,
+.control-event-grid textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #d5e0d8;
+  border-radius: 6px;
+  background: #fff;
+  color: #1d2c24;
+  font: inherit;
+  font-weight: 400;
+}
+
+.control-event-grid textarea {
+  resize: vertical;
+}
+
+.control-event-form > button {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 7px;
+  background: #216b43;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.control-event-form > button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.control-profile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
   padding: 26px;
 }
 
@@ -400,6 +799,12 @@
   font-size: 24px;
 }
 
+.control-profile-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
 .control-profile h2 {
   margin: 0;
   color: #213b2a;
@@ -407,14 +812,76 @@
 }
 
 .control-profile p {
-  margin: 7px 0 18px;
+  margin: 7px 0 12px;
   color: #718176;
   font-size: 12px;
 }
 
-.control-profile dl {
+.control-profile-photo {
+  position: relative;
+  display: inline-flex;
+  color: #216b43;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.control-profile-photo input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  clip-path: inset(50%);
+}
+
+.control-profile-photo:focus-within {
+  outline: 2px solid #216b43;
+  outline-offset: 3px;
+}
+
+.control-profile-photo-hint {
+  display: block;
+  margin-top: 5px;
+  color: #829086;
+  font-size: 10px;
+}
+
+.control-profile-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid #e8eee9;
+}
+
+.control-profile-form > label {
+  display: grid;
+  gap: 6px;
+  color: #718176;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.control-profile-form input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid #d5e0d8;
+  border-radius: 7px;
+  background: #fff;
+  color: #314238;
+  font: inherit;
+  font-weight: 400;
+}
+
+.control-profile dl {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px 26px;
   margin: 0;
 }
@@ -429,6 +896,25 @@
   color: #314238;
   font-size: 12px;
   font-weight: 650;
+}
+
+.control-profile-form > button {
+  justify-self: end;
+  min-height: 38px;
+  padding: 9px 15px;
+  border: 0;
+  border-radius: 7px;
+  background: #216b43;
+  color: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.control-profile-form > button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 .control-denied {
@@ -463,6 +949,10 @@
 
 @media (max-width: 900px) {
   .control-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .control-calendar-layout {
     grid-template-columns: 1fr;
   }
 }
@@ -529,11 +1019,73 @@
   }
 
   .control-profile {
-    flex-direction: column;
     padding: 20px;
+  }
+
+  .control-profile-form {
+    grid-template-columns: 1fr;
+  }
+
+  .control-attendance-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .control-attendance-actions {
+    width: 100%;
+  }
+
+  .control-attendance-filter {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .control-attendance-filter select {
+    width: 100%;
+    min-width: 0;
   }
 
   .control-profile dl {
     grid-template-columns: 1fr;
+  }
+
+  .control-profile-form > button {
+    justify-self: stretch;
+  }
+
+  .control-event-modal-backdrop {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .control-event-modal {
+    max-height: 94vh;
+  }
+
+  .control-event-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .control-event-grid .wide {
+    grid-column: auto;
+  }
+
+  .control-calendar {
+    padding: 12px;
+  }
+
+  .control-calendar-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .control-calendar-day {
+    min-height: 70px;
+    padding: 4px;
+  }
+
+  .control-calendar-event,
+  .control-calendar-more {
+    font-size: 8px;
   }
 }

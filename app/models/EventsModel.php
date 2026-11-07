@@ -13,6 +13,7 @@ class EventsModel extends Model
     protected $fillable = [
         'category_id',
         'dept_id',
+        'org_id',
         'title',
         'description',
         'venue',
@@ -20,7 +21,11 @@ class EventsModel extends Model
         'start_datetime',
         'end_datetime',
         'status',
-        'created_by'
+        'created_by',
+        'approval_status',
+        'approval_note',
+        'reviewed_by',
+        'reviewed_at'
     ];
 
     protected $guarded = [

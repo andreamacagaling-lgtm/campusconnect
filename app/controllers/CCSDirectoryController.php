@@ -36,7 +36,7 @@ class CCSDirectoryController extends Controller
 
             // Verify the user's role and department using the database.
             $result = $this->db->raw(
-                'SELECT user_id, role, dept_id, status
+                'SELECT user_id, role, admin_type, dept_id, status
                  FROM users
                  WHERE user_id = ?
                  LIMIT 1',
@@ -56,6 +56,7 @@ class CCSDirectoryController extends Controller
             // Only CCS Department Admins can access this directory.
             if (
                 $admin['role'] !== 'admin' ||
+                $admin['admin_type'] !== 'department' ||
                 (int) $admin['dept_id'] !== 1
             ) {
                 $this->api->respond_error(

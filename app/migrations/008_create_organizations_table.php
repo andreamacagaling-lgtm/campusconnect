@@ -48,9 +48,9 @@ class Create_organizations_table
                 ],
                 'status' => [
                     'type'       => 'ENUM',
-                    'constraint' => "'active','inactive'",
+                    'constraint' => "'pending','active','inactive'",
                     'null'       => FALSE,
-                    'default'    => 'active'
+                    'default'    => 'pending'
                 ],
                 'created_at' => [
                     'type'    => 'TIMESTAMP',

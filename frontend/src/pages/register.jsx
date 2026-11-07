@@ -1,7 +1,10 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api";
+import { getAuthDestination, persistAuthSession } from "../authSession";
+import AuthLayout from "../components/AuthLayout";
+import GoogleSignInButton from "../components/GoogleSignInButton";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -10,6 +13,7 @@ export default function Register() {
     full_name: "",
     student_no: "",
     email: "",
+    dept_id: "",
     password: "",
     confirmPassword: "",
   });
@@ -19,6 +23,46 @@ export default function Register() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [departments, setDepartments] = useState([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+  const [departmentsError, setDepartmentsError] = useState("");
+  const [pendingGoogleCredential, setPendingGoogleCredential] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadDepartments() {
+      try {
+        const response = await api.get("/auth/departments");
+        const data = response.data?.data;
+        if (!Array.isArray(data)) {
+          throw new Error("Department list was not returned by the server.");
+        }
+
+        if (active) {
+          setDepartments(data);
+          setDepartmentsError("");
+        }
+      } catch (requestError) {
+        if (active) {
+          setDepartmentsError(
+            requestError.response?.data?.message ||
+              requestError.response?.data?.error ||
+              requestError.message ||
+              "Unable to load departments."
+          );
+        }
+      } finally {
+        if (active) setDepartmentsLoading(false);
+      }
+    }
+
+    loadDepartments();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -34,7 +78,12 @@ export default function Register() {
     setError("");
     setSuccess("");
 
-    if (!form.full_name.trim() || !form.email.trim() || !form.password) {
+    if (
+      !form.full_name.trim() ||
+      !form.email.trim() ||
+      !form.dept_id ||
+      !form.password
+    ) {
       setError("Please complete all required fields.");
       return;
     }
@@ -55,6 +104,7 @@ export default function Register() {
       const payload = {
         full_name: form.full_name.trim(),
         email: form.email.trim().toLowerCase(),
+        dept_id: form.dept_id,
         password: form.password,
       };
 
@@ -93,16 +143,62 @@ export default function Register() {
     }
   };
 
-  return (
-    <main className="auth-page">
-      <section className="auth-card auth-card-register">
-        <Link to="/login" className="auth-brand">
-          <span className="brand-icon">C</span>
-          <span>Campus<span className="brand-highlight">Connect</span></span>
-        </Link>
+  const submitGoogleCredential = async (credential) => {
+    setError("");
+    setSuccess("");
+    setGoogleLoading(true);
 
+    try {
+      const response = await api.post("/auth/google", {
+        credential,
+        dept_id: form.dept_id || null,
+        mode: "auto",
+      });
+
+      if (!persistAuthSession(response.data)) {
+        setError("Invalid response from the server. Please try again.");
+        return;
+      }
+
+      setPendingGoogleCredential("");
+      navigate(getAuthDestination(response.data.user), { replace: true });
+    } catch (requestError) {
+      const status = requestError.response?.status;
+      const serverMessage =
+        requestError.response?.data?.message ||
+        requestError.response?.data?.error;
+
+      if (!requestError.response) {
+        setError("Cannot connect to the server. Please try again.");
+      } else if (
+        status === 422 &&
+        serverMessage === "Please select your department to finish Google registration."
+      ) {
+        setPendingGoogleCredential(credential);
+        setError("Choose your department above, then continue with Google.");
+      } else {
+        setError(serverMessage || "Google account verification failed. Please try again.");
+      }
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleCredential = (credential) => {
+    setPendingGoogleCredential("");
+    submitGoogleCredential(credential);
+  };
+
+  const continueGoogleRegistration = () => {
+    if (pendingGoogleCredential && form.dept_id) {
+      submitGoogleCredential(pendingGoogleCredential);
+    }
+  };
+
+  return (
+    <AuthLayout variant="register">
+      <section className="auth-card auth-card-register">
         <div className="auth-heading">
-          <p className="auth-eyebrow">JOIN YOUR COMMUNITY</p>
           <h1>Create your account</h1>
           <p>Stay updated with university events and organizations.</p>
         </div>
@@ -120,7 +216,7 @@ export default function Register() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="auth-form">
+        <form onSubmit={handleSubmit} className="auth-form auth-form-register">
           <div className="form-field">
             <label htmlFor="register-full-name">Full name *</label>
             <input
@@ -160,6 +256,34 @@ export default function Register() {
               autoComplete="email"
               required
             />
+          </div>
+
+          <div className="form-field">
+            <label htmlFor="register-department">Department *</label>
+            <select
+              id="register-department"
+              name="dept_id"
+              value={form.dept_id}
+              onChange={handleChange}
+              disabled={departmentsLoading || departments.length === 0}
+              required
+            >
+              <option value="">
+                {departmentsLoading
+                  ? "Loading departments..."
+                  : "Choose your department"}
+              </option>
+              {departments.map((department) => (
+                <option key={department.dept_id} value={department.dept_id}>
+                  {department.dept_name}
+                </option>
+              ))}
+            </select>
+            {departmentsError && (
+              <small className="department-error" role="status">
+                {departmentsError}
+              </small>
+            )}
           </div>
 
           <div className="form-field">
@@ -219,21 +343,43 @@ export default function Register() {
           <button
             type="submit"
             className="auth-submit"
-            disabled={loading}
+            disabled={loading || googleLoading}
           >
             {loading ? "Creating account..." : "Create Account"}
             {!loading && <span aria-hidden="true">→</span>}
           </button>
         </form>
 
+        <div className="auth-divider"><span>or</span></div>
+        <GoogleSignInButton
+          onCredential={handleGoogleCredential}
+          disabled={loading || googleLoading || Boolean(pendingGoogleCredential)}
+          iconOnly
+        />
+        {googleLoading && (
+          <p className="auth-google-note" role="status">
+            Verifying your Google account...
+          </p>
+        )}
+        {pendingGoogleCredential && (
+          <>
+            <button
+              type="button"
+              className="auth-submit auth-google-continue"
+              onClick={continueGoogleRegistration}
+              disabled={!form.dept_id || googleLoading}
+            >
+              Continue with Google
+              <span aria-hidden="true">→</span>
+            </button>
+          </>
+        )}
+
         <p className="auth-switch">
           Already have an account? <Link to="/login">Sign in</Link>
         </p>
 
-        <p className="auth-footer">
-          Your campus community, all in one place.
-        </p>
       </section>
-    </main>
+    </AuthLayout>
   );
 }

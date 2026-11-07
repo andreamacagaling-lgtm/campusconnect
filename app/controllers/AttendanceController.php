@@ -60,6 +60,7 @@ class AttendanceController extends Controller
                 er.event_id,
                 er.registered_at,
                 e.title AS event_title,
+                event_department.dept_name AS event_dept_name,
                 e.start_datetime,
                 e.end_datetime,
                 e.status AS event_status,
@@ -68,14 +69,13 @@ class AttendanceController extends Controller
                 u.full_name,
                 u.email,
                 d.dept_id,
-                d.dept_code,
                 d.dept_name,
                 yl.yr_id,
                 yl.yr_name,
                 s.section_id,
                 s.section_name,
                 a.attendance_id,
-                a.scanned_at,
+                UNIX_TIMESTAMP(a.scanned_at) AS scanned_at,
                 a.scanned_by,
                 a.status AS recorded_status,
                 CASE
@@ -87,13 +87,16 @@ class AttendanceController extends Controller
             INNER JOIN events e ON e.event_id = er.event_id
             INNER JOIN users u ON u.user_id = er.user_id
             LEFT JOIN sections s ON s.section_id = u.section_id
-            LEFT JOIN departments d ON d.dept_id = s.dept_id
+            LEFT JOIN departments d ON d.dept_id = u.dept_id
+            LEFT JOIN departments event_department
+                ON event_department.dept_id = e.dept_id
             LEFT JOIN yr_levels yl ON yl.yr_id = u.yr_id
             LEFT JOIN attendance a ON a.event_reg_id = er.event_reg_id
             WHERE 1 = 1
         ";
 
         $params = [];
+        $this->append_attendance_scope($sql, $params, $user);
 
         if ($eventId !== '') {
             $sql .= ' AND er.event_id = ?';
@@ -188,13 +191,14 @@ class AttendanceController extends Controller
             INNER JOIN events e ON e.event_id = er.event_id
             INNER JOIN users u ON u.user_id = er.user_id
             LEFT JOIN sections s ON s.section_id = u.section_id
-            LEFT JOIN departments d ON d.dept_id = s.dept_id
+            LEFT JOIN departments d ON d.dept_id = u.dept_id
             LEFT JOIN yr_levels yl ON yl.yr_id = u.yr_id
             LEFT JOIN attendance a ON a.event_reg_id = er.event_reg_id
             WHERE er.event_id = ?
         ";
 
         $params = [(int) $eventId];
+        $this->append_attendance_scope($sql, $params, $user);
 
         if ($deptId !== '') {
             $sql .= ' AND d.dept_id = ?';
@@ -261,23 +265,30 @@ class AttendanceController extends Controller
                 er.event_id,
                 er.qr_token,
                 e.title AS event_title,
+                e.dept_id AS event_dept_id,
+                e.approval_status,
                 e.start_datetime,
                 e.end_datetime,
                 e.status AS event_status,
                 u.user_id,
                 u.student_no,
                 u.full_name,
+                sp.avatar AS avatar_url,
                 d.dept_name,
+                event_department.dept_name AS event_dept_name,
                 yl.yr_name,
                 s.section_name,
                 a.attendance_id,
                 a.status AS existing_status,
-                a.scanned_at AS existing_scanned_at
+                UNIX_TIMESTAMP(a.scanned_at) AS existing_scanned_at
             FROM event_registrations er
             INNER JOIN events e ON e.event_id = er.event_id
             INNER JOIN users u ON u.user_id = er.user_id
+            LEFT JOIN student_profiles sp ON sp.user_id = u.user_id
             LEFT JOIN sections s ON s.section_id = u.section_id
-            LEFT JOIN departments d ON d.dept_id = s.dept_id
+            LEFT JOIN departments d ON d.dept_id = u.dept_id
+            LEFT JOIN departments event_department
+                ON event_department.dept_id = e.dept_id
             LEFT JOIN yr_levels yl ON yl.yr_id = u.yr_id
             LEFT JOIN attendance a ON a.event_reg_id = er.event_reg_id
             WHERE er.qr_token = ?
@@ -294,9 +305,25 @@ class AttendanceController extends Controller
 
             $registration = $rows[0];
 
-            if ($registration->event_status !== 'ongoing') {
+            if (!$this->can_manage_event($user, $registration->event_dept_id)) {
                 $this->api->respond_error(
-                    'The event must be ongoing before attendance can be scanned.',
+                    'Only the event department can record its attendance.',
+                    403
+                );
+                return;
+            }
+
+            if ($registration->approval_status !== 'approved') {
+                $this->api->respond_error(
+                    'Attendance is available only for approved events.',
+                    409
+                );
+                return;
+            }
+
+            if (!in_array($registration->event_status, ['upcoming', 'ongoing'], true)) {
+                $this->api->respond_error(
+                    'Attendance is unavailable for completed or cancelled events.',
                     409
                 );
                 return;
@@ -306,9 +333,9 @@ class AttendanceController extends Controller
             $start = strtotime($registration->start_datetime);
             $end = strtotime($registration->end_datetime);
 
-            if ($start === false || $end === false || $now < $start || $now > $end) {
+            if ($start === false || $end === false || $now > $end) {
                 $this->api->respond_error(
-                    'The current time is outside the event attendance window.',
+                    'Attendance is available until the event ends.',
                     409
                 );
                 return;
@@ -322,7 +349,10 @@ class AttendanceController extends Controller
                         'event_reg_id' => (int) $registration->event_reg_id,
                         'student_no' => $registration->student_no,
                         'full_name' => $registration->full_name,
+                        'avatar_url' => $registration->avatar_url,
                         'event_title' => $registration->event_title,
+                        'department' => $registration->dept_name,
+                        'event_department' => $registration->event_dept_name,
                         'attendance_status' => $registration->existing_status,
                         'scanned_at' => $registration->existing_scanned_at
                     ]
@@ -342,7 +372,7 @@ class AttendanceController extends Controller
 
             $this->run_write($insertSql, [
                 (int) $registration->event_reg_id,
-                (int) $user['sub'],
+                (int) $user['user_id'],
                 $attendanceStatus
             ]);
 
@@ -353,8 +383,10 @@ class AttendanceController extends Controller
                     'event_reg_id' => (int) $registration->event_reg_id,
                     'event_id' => (int) $registration->event_id,
                     'event_title' => $registration->event_title,
+                    'event_department' => $registration->event_dept_name,
                     'student_no' => $registration->student_no,
                     'full_name' => $registration->full_name,
+                    'avatar_url' => $registration->avatar_url,
                     'department' => $registration->dept_name,
                     'year_level' => $registration->yr_name,
                     'section' => $registration->section_name,
@@ -405,12 +437,26 @@ class AttendanceController extends Controller
 
         try {
             $existing = $this->run_select(
-                'SELECT attendance_id FROM attendance WHERE event_reg_id = ? LIMIT 1',
+                'SELECT a.attendance_id, e.dept_id AS event_dept_id
+                 FROM attendance a
+                 INNER JOIN event_registrations er
+                    ON er.event_reg_id = a.event_reg_id
+                 INNER JOIN events e ON e.event_id = er.event_id
+                 WHERE a.event_reg_id = ?
+                 LIMIT 1',
                 [(int) $id]
             );
 
             if (empty($existing)) {
                 $this->api->respond_error('Attendance record not found.', 404);
+                return;
+            }
+
+            if (!$this->can_manage_event($user, $existing[0]->event_dept_id)) {
+                $this->api->respond_error(
+                    'Only the event department can manage its attendance.',
+                    403
+                );
                 return;
             }
 
@@ -445,6 +491,29 @@ class AttendanceController extends Controller
         }
 
         try {
+            $existing = $this->run_select(
+                'SELECT e.dept_id AS event_dept_id
+                 FROM event_registrations er
+                 INNER JOIN events e ON e.event_id = er.event_id
+                 INNER JOIN attendance a ON a.event_reg_id = er.event_reg_id
+                 WHERE er.event_reg_id = ?
+                 LIMIT 1',
+                [(int) $id]
+            );
+
+            if (empty($existing)) {
+                $this->api->respond_error('Attendance record not found.', 404);
+                return;
+            }
+
+            if (!$this->can_manage_event($user, $existing[0]->event_dept_id)) {
+                $this->api->respond_error(
+                    'Only the event department can manage its attendance.',
+                    403
+                );
+                return;
+            }
+
             $this->run_write(
                 'DELETE FROM attendance WHERE event_reg_id = ?',
                 [(int) $id]
@@ -462,18 +531,77 @@ class AttendanceController extends Controller
 
     private function require_admin()
     {
-        $user = $this->api->require_jwt();
+        $claims = $this->api->require_jwt();
 
         if (
-            !is_array($user) ||
-            !isset($user['sub'], $user['role']) ||
-            $user['role'] !== 'admin'
+            !is_array($claims) ||
+            !isset($claims['sub']) ||
+            !$this->valid_id($claims['sub'])
         ) {
-            $this->api->respond_error('Admin access required.', 403);
+            $this->api->respond_error('Invalid authentication token.', 401);
             return null;
         }
 
-        return $user;
+        try {
+            $rows = $this->run_select(
+                'SELECT user_id, role, admin_type, dept_id, status
+                 FROM users
+                 WHERE user_id = ?
+                 LIMIT 1',
+                [(int) $claims['sub']]
+            );
+
+            if (empty($rows)) {
+                $this->api->respond_error('User account not found.', 401);
+                return null;
+            }
+
+            $user = (array) $rows[0];
+            $user['user_id'] = (int) $user['user_id'];
+            $user['dept_id'] = ($user['dept_id'] === null || $user['dept_id'] === '')
+                ? null
+                : (int) $user['dept_id'];
+            $user['admin_type'] = $user['admin_type'] ?? 'department';
+
+            if ($user['status'] !== 'active') {
+                $this->api->respond_error('This account is inactive.', 403);
+                return null;
+            }
+
+            if (
+                $user['role'] !== 'admin' ||
+                in_array($user['admin_type'], ['osse', 'organization'], true)
+            ) {
+                $this->api->respond_error('Admin attendance access required.', 403);
+                return null;
+            }
+
+            return $user;
+        } catch (Throwable $e) {
+            error_log('AttendanceController require_admin: ' . $e->getMessage());
+            $this->api->respond_error('Unable to verify the user account.', 500);
+            return null;
+        }
+    }
+
+    private function append_attendance_scope(&$sql, &$params, $user)
+    {
+        if ($user['admin_type'] !== 'usg') {
+            $sql .= ' AND e.dept_id = ?';
+            $params[] = (int) $user['dept_id'];
+        }
+    }
+
+    private function can_manage_event($user, $eventDeptId)
+    {
+        if ($user['admin_type'] === 'usg') {
+            return $eventDeptId === null || $eventDeptId === '';
+        }
+
+        return $user['dept_id'] !== null
+            && $eventDeptId !== null
+            && $eventDeptId !== ''
+            && (int) $eventDeptId === (int) $user['dept_id'];
     }
 
     private function valid_id($id)

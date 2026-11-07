@@ -17,7 +17,9 @@ return [
         2 => getenv('GOOGLE_CALENDAR_CCJE_ID') ?: '',
         3 => getenv('GOOGLE_CALENDAR_CBM_ID') ?: '',
         4 => getenv('GOOGLE_CALENDAR_CAS_ID') ?: '',
-        5 => getenv('GOOGLE_CALENDAR_BTVTED_ID') ?: '',
+        5 => getenv('GOOGLE_CALENDAR_BTVTED_ID')
+            ?: getenv('GOOGLE_CALENDAR_BTLED_ID')
+            ?: '',
         6 => getenv('GOOGLE_CALENDAR_BSED_ID') ?: '',
     ],
 ];

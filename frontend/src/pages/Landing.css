@@ -1,0 +1,235 @@
+.landing-page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: clamp(24px, 5vw, 58px) clamp(24px, 7vw, 96px) 28px;
+  color: #fff;
+  background: #063b28;
+}
+
+.landing-backdrop {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(2, 39, 27, 0.88) 0%, rgba(2, 39, 27, 0.67) 47%, rgba(2, 39, 27, 0.18) 100%),
+    linear-gradient(0deg, rgba(2, 39, 27, 0.38), transparent 38%),
+    url("/images/campus-building.jpg") center / cover;
+  transform: scale(1.01);
+}
+
+.landing-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.landing-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: "Manrope", sans-serif;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+}
+
+.landing-brand img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #fff;
+  object-fit: cover;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.28));
+}
+
+.landing-brand > span > span {
+  color: #a4ecc0;
+}
+
+.landing-brand small {
+  display: block;
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.78);
+  font-family: "DM Sans", sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.landing-content {
+  width: min(1100px, 100%);
+  margin: auto 0;
+  padding: clamp(28px, 6vh, 52px) 0;
+  align-self: center;
+  text-align: center;
+}
+
+.landing-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #b7efce;
+  font-size: clamp(17px, 1.7vw, 23px);
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-align: right;
+}
+
+.landing-eyebrow::before {
+  width: 24px;
+  height: 2px;
+  background: #a4ecc0;
+  content: none;
+}
+
+.landing-content h1 {
+  margin: 20px 0 17px;
+  font-family: "Manrope", sans-serif;
+  font-size: clamp(38px, 5.5vw, 82px);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -3px;
+  white-space: nowrap;
+}
+
+.landing-content p {
+  max-width: 820px;
+  margin: 0 auto;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: clamp(16px, 1.5vw, 19px);
+  line-height: 1.9;
+  text-align: center;
+}
+
+.landing-description-break {
+  display: none;
+}
+
+@media (min-width: 761px) {
+  .landing-description-break {
+    display: initial;
+  }
+}
+
+.landing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.landing-button {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 22px;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+
+.landing-button:hover {
+  transform: translateY(-2px);
+}
+
+.landing-button-primary {
+  border-color: #b3edc8;
+  background: #b3edc8;
+  color: #073a27;
+}
+
+.landing-button-primary:hover {
+  background: #d3f6df;
+}
+
+.landing-button-primary span {
+  font-size: 19px;
+  line-height: 1;
+}
+
+.landing-footer {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+}
+
+.landing-footer span {
+  padding: 0 5px;
+  color: #a4ecc0;
+}
+
+@media (max-width: 600px) {
+  .landing-page {
+    padding: 22px 22px 24px;
+  }
+
+  .landing-backdrop {
+    background:
+      linear-gradient(90deg, rgba(2, 39, 27, 0.82), rgba(2, 39, 27, 0.52)),
+      linear-gradient(0deg, rgba(2, 39, 27, 0.5), transparent 60%),
+      url("/images/campus-building.jpg") 57% center / cover;
+  }
+
+  .landing-brand {
+    gap: 8px;
+    font-size: 16px;
+  }
+
+  .landing-brand img {
+    width: 40px;
+    height: 40px;
+  }
+
+  .landing-brand small {
+    font-size: 10px;
+  }
+
+  .landing-header {
+    gap: 12px;
+  }
+
+  .landing-eyebrow {
+    max-width: 145px;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+
+  .landing-content {
+    padding: clamp(32px, 7vh, 52px) 0;
+  }
+
+  .landing-content h1 {
+    font-size: clamp(25px, 7vw, 42px);
+    letter-spacing: -1.5px;
+    white-space: normal;
+  }
+
+  .landing-content p {
+    max-width: 500px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 380px) {
+  .landing-header {
+    align-items: flex-start;
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-button {
+    transition: none;
+  }
+}
