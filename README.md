@@ -222,11 +222,24 @@ user's `email` field. Existing users are linked on their next successful
 Google sign-in.
 
 Create an OAuth 2.0 **Web application** client ID in Google Cloud Console and
-add the frontend origin (for example, `http://localhost:5173`) to its
-authorized JavaScript origins. Set the same client ID as
-`GOOGLE_OAUTH_CLIENT_ID` in the backend `.env` and `VITE_GOOGLE_CLIENT_ID` in
-`frontend/.env`. Copy `frontend/.env.example` as a starting point, then restart
-the frontend and backend. Keep the two client ID values identical.
+add each frontend origin (for example, `http://localhost:5173`) to its
+authorized JavaScript origins. For the deployed frontend, add
+`https://campusconnect-v9er.vercel.app` (and any custom domain) as well.
+
+Set the same client ID in both environments:
+
+- Local frontend: `VITE_GOOGLE_CLIENT_ID` in `frontend/.env`.
+- Local backend: `GOOGLE_OAUTH_CLIENT_ID` in the backend `.env`.
+- Deployed frontend: `VITE_GOOGLE_CLIENT_ID` in the Vercel project's
+  Environment Variables, for the environments you deploy (Production and,
+  optionally, Preview).
+- Deployed backend: `GOOGLE_OAUTH_CLIENT_ID` in the Render service's
+  environment variables.
+
+The Vercel variable is embedded when the frontend is built, so redeploy the
+frontend after adding or changing it. The frontend and backend client IDs must
+match. The client ID is public; do not put the OAuth client secret in the
+frontend.
 
 ## Event approval roles
 
