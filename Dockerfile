@@ -6,8 +6,12 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
  
-# Install PDO MySQL
-RUN docker-php-ext-install pdo pdo_mysql
+# Install PHP extensions required by the application and Composer.
+RUN apt-get update \
+&& apt-get install -y --no-install-recommends libzip-dev \
+&& docker-php-ext-install pdo pdo_mysql zip \
+&& apt-get purge -y --auto-remove libzip-dev \
+&& rm -rf /var/lib/apt/lists/*
  
 # Enable Apache mod_rewrite
 RUN a2enmod rewrite
