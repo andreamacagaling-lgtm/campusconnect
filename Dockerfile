@@ -10,7 +10,6 @@ WORKDIR /var/www/html
 RUN apt-get update \
 && apt-get install -y --no-install-recommends libzip-dev \
 && docker-php-ext-install pdo pdo_mysql zip \
-&& apt-get purge -y --auto-remove libzip-dev \
 && rm -rf /var/lib/apt/lists/*
  
 # Enable Apache mod_rewrite
