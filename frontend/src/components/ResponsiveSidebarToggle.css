@@ -42,6 +42,19 @@
 }
 
 @media (max-width: 850px) {
+  .student-topbar,
+  .control-topbar,
+  .admin-topbar,
+  .osse-header,
+  .ccs-admin-topbar,
+  .ccje-topbar,
+  .cbm-topbar,
+  .cas-topbar,
+  .btvted-topbar,
+  .bsed-topbar {
+    padding-left: 76px !important;
+  }
+
   .responsive-sidebar-backdrop {
     position: fixed;
     inset: 0;

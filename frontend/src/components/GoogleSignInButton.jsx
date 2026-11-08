@@ -44,6 +44,21 @@ export default function GoogleSignInButton({
   const onCredentialRef = useRef(onCredential);
   const [error, setError] = useState("");
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+  const isEmbeddedBrowser =
+    /(FBAN|FBAV|FB_IAB|Messenger|Instagram|; wv\))/i.test(
+      navigator.userAgent
+    );
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  const chromeIntentUrl = (() => {
+    const currentUrl = new URL(window.location.href);
+    const fallbackUrl = encodeURIComponent(currentUrl.href);
+    const path = `${currentUrl.host}${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`;
+
+    return `intent://${path}#Intent;scheme=${currentUrl.protocol.slice(
+      0,
+      -1
+    )};package=com.android.chrome;S.browser_fallback_url=${fallbackUrl};end`;
+  })();
 
   useEffect(() => {
     onCredentialRef.current = onCredential;
@@ -51,7 +66,7 @@ export default function GoogleSignInButton({
 
   useEffect(() => {
     const buttonElement = buttonRef.current;
-    if (!clientId || !buttonElement) return undefined;
+    if (!clientId || !buttonElement || isEmbeddedBrowser) return undefined;
 
     let active = true;
     const credentialHandler = (credential) => {
@@ -108,7 +123,7 @@ export default function GoogleSignInButton({
       }
       buttonElement.replaceChildren();
     };
-  }, [clientId, iconOnly]);
+  }, [clientId, iconOnly, isEmbeddedBrowser]);
 
   return (
     <div
@@ -118,7 +133,22 @@ export default function GoogleSignInButton({
         iconOnly && "is-icon-only",
       ].filter(Boolean).join(" ")}
     >
-      {clientId ? (
+      {isEmbeddedBrowser ? (
+        <div className="auth-google-browser-message" role="status">
+          <p>
+            Google sign-in does not work inside Messenger or other in-app
+            browsers.{" "}
+            {isAndroid
+              ? "Open CampusConnect in Chrome, then try again."
+              : "Open this page in your phone's browser, then try again."}
+          </p>
+          {isAndroid && (
+            <a className="auth-google-browser-link" href={chromeIntentUrl}>
+              Open in Chrome
+            </a>
+          )}
+        </div>
+      ) : clientId ? (
         <>
           <div ref={buttonRef} />
           {iconOnly && (

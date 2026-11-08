@@ -101,7 +101,7 @@ export default function Login() {
         requestError.response?.data?.error;
 
       if (!requestError.response) {
-        ("Cannot connect to the server. Please try again.");
+        setError("Cannot connect to the server. Please try again.");
       } else if (status === 404) {
         setError("No account is registered with this Google email. Create an account first.");
       } else {
