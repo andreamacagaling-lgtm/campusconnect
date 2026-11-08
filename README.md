@@ -241,6 +241,9 @@ frontend after adding or changing it. The frontend and backend client IDs must
 match. The client ID is public; do not put the OAuth client secret in the
 frontend.
 
+The Render Docker build installs PHP dependencies from `composer.lock`, so keep
+that lockfile committed whenever `composer.json` changes.
+
 ## Event approval roles
 
 Campus-wide events submitted by USG, department events, and organization
