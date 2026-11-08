@@ -71,29 +71,8 @@
     display: none !important;
 }
 
-@media (max-width: 760px) {
-    .student-signout,
-    .control-logout,
-    .osse-signout,
-    .admin-logout,
-    .bsed-logout,
-    .btvted-logout,
-    .cas-logout,
-    .cbm-logout,
-    .ccje-logout,
-    .ccs-admin-logout {
-        display: none !important;
-    }
-
+@media (max-width: 850px) {
     .session-logout-button {
-        display: inline-flex;
-        top: 12px;
-        right: 14px;
-        width: 38px;
-        min-height: 38px;
-        justify-content: center;
-        gap: 0;
-        padding: 0;
-        font-size: 0;
+        display: none;
     }
 }

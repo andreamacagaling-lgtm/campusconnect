@@ -96,7 +96,10 @@
     left: 16px;
     z-index: 22;
     margin: 0;
-    background: #102d22;
+    border-color: #fff;
+    background: #fff;
+    color: #15583a;
+    box-shadow: 0 4px 14px rgb(10 42 27 / 22%);
   }
 
   .responsive-sidebar .student-mobile-signout {
@@ -128,8 +131,36 @@
 
   .responsive-sidebar-open .responsive-sidebar-bottom {
     display: block !important;
-    margin-top: 12px !important;
-    padding-top: 12px !important;
+    margin-top: auto !important;
+    padding-top: 16px !important;
+    border-top: 1px solid rgb(255 255 255 / 16%);
+  }
+
+  .responsive-sidebar-open .responsive-sidebar-bottom > button,
+  .responsive-sidebar-open .responsive-sidebar-bottom .admin-logout {
+    display: flex !important;
+    width: 100% !important;
+    min-height: 44px;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 10px 13px !important;
+    border: 1px solid rgb(255 255 255 / 24%) !important;
+    border-radius: 10px !important;
+    background: rgb(255 255 255 / 9%) !important;
+    color: #fff !important;
+    font: inherit;
+    font-size: 13px !important;
+    font-weight: 650;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .responsive-sidebar-open .responsive-sidebar-bottom > button:hover,
+  .responsive-sidebar-open .responsive-sidebar-bottom .admin-logout:hover {
+    border-color: rgb(255 255 255 / 40%) !important;
+    background: rgb(255 255 255 / 16%) !important;
   }
 
   .responsive-sidebar ~ main {
