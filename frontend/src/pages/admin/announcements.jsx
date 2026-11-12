@@ -68,22 +68,47 @@ function getErrorMessage(err, fallback) {
     );
 }
 
-function formatDateTime(value) {
+function formatDateTime(value, { timeZone = "Asia/Manila", assumeTimeZone = "Asia/Manila" } = {}) {
     if (!value) return "—";
 
-    const normalized =
-        typeof value === "string" ? value.replace(" ", "T") : value;
-
-    const date = new Date(normalized);
+    const numericValue = Number(value);
+    const isTimestamp =
+        (typeof value === "number" || /^\d+(?:\.\d+)?$/.test(String(value))) &&
+        Number.isFinite(numericValue);
+    const normalized = typeof value === "string" ? value.trim().replace(" ", "T") : value;
+    const hasTimeZone =
+        typeof normalized === "string" &&
+        /(?:Z|[+-]\d{2}:\d{2})$/i.test(normalized);
+    const date = isTimestamp
+        ? new Date(numericValue * 1000)
+        : new Date(
+              typeof normalized === "string" && !hasTimeZone
+                  ? `${normalized}${assumeTimeZone === "UTC" ? "Z" : "+08:00"}`
+                  : normalized
+          );
 
     if (Number.isNaN(date.getTime())) {
         return String(value);
     }
 
     return date.toLocaleString("en-PH", {
+        timeZone,
         dateStyle: "medium",
         timeStyle: "short",
+        hour12: true,
     });
+}
+
+function getAnnouncementTimestamp(announcement) {
+    const timestamp = Number(announcement.created_at_timestamp);
+    if (Number.isFinite(timestamp) && timestamp > 0) return timestamp * 1000;
+
+    const value = String(announcement.created_at ?? "").trim().replace(" ", "T");
+    if (!value) return 0;
+
+    const hasTimeZone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
+    const parsed = new Date(hasTimeZone ? value : `${value}Z`).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 function AdminSidebar({ activePage, user }) {
@@ -529,31 +554,13 @@ export default function Announcements() {
         );
     });
 
-    const sortedAnnouncements = [...filteredAnnouncements].sort((a, b) => {
-        const dateA = new Date(
-            String(a.created_at ?? "").replace(" ", "T")
-        ).getTime();
+    const sortedAnnouncements = [...filteredAnnouncements].sort(
+        (a, b) => getAnnouncementTimestamp(b) - getAnnouncementTimestamp(a)
+    );
 
-        const dateB = new Date(
-            String(b.created_at ?? "").replace(" ", "T")
-        ).getTime();
-
-        return (Number.isNaN(dateB) ? 0 : dateB) -
-            (Number.isNaN(dateA) ? 0 : dateA);
-    });
-
-    const latestAnnouncement = [...announcements].sort((a, b) => {
-        const dateA = new Date(
-            String(a.created_at ?? "").replace(" ", "T")
-        ).getTime();
-
-        const dateB = new Date(
-            String(b.created_at ?? "").replace(" ", "T")
-        ).getTime();
-
-        return (Number.isNaN(dateB) ? 0 : dateB) -
-            (Number.isNaN(dateA) ? 0 : dateA);
-    })[0];
+    const latestAnnouncement = [...announcements].sort(
+        (a, b) => getAnnouncementTimestamp(b) - getAnnouncementTimestamp(a)
+    )[0];
 
     return (
         <div className="admin-layout">
@@ -632,7 +639,11 @@ export default function Announcements() {
                                 <span>Latest Announcement</span>
                                 <strong className="announcements-latest-value">
                                     {latestAnnouncement
-                                        ? formatDateTime(latestAnnouncement.created_at)
+                                        ? formatDateTime(
+                                              latestAnnouncement.created_at_timestamp ??
+                                                  latestAnnouncement.created_at,
+                                              { timeZone: "Asia/Manila", assumeTimeZone: "UTC" }
+                                          )
                                         : "None yet"}
                                 </strong>
                             </div>
@@ -753,7 +764,11 @@ export default function Announcements() {
                                                 </td>
 
                                                 <td>
-                                                    {formatDateTime(item.created_at)}
+                                                    {formatDateTime(
+                                                        item.created_at_timestamp ??
+                                                            item.created_at,
+                                                        { timeZone: "Asia/Manila", assumeTimeZone: "UTC" }
+                                                    )}
                                                 </td>
 
                                                 <td>

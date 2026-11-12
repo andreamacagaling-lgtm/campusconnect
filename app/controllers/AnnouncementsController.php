@@ -39,7 +39,8 @@ class AnnouncementsController extends Controller
                 }
 
                 $announcement = $this->db->raw(
-                    'SELECT a.*, e.title AS event_title,
+                    'SELECT a.*, UNIX_TIMESTAMP(a.created_at) AS created_at_timestamp,
+                            e.title AS event_title,
                             e.start_datetime AS event_start_datetime,
                             e.end_datetime AS event_end_datetime,
                             e.venue AS event_venue,
@@ -68,7 +69,8 @@ class AnnouncementsController extends Controller
             }
 
             $announcements = $this->db->raw(
-                'SELECT a.*, e.title AS event_title,
+                'SELECT a.*, UNIX_TIMESTAMP(a.created_at) AS created_at_timestamp,
+                        e.title AS event_title,
                         e.start_datetime AS event_start_datetime,
                         e.end_datetime AS event_end_datetime,
                         e.venue AS event_venue,
