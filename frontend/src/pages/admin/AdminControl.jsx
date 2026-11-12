@@ -1165,6 +1165,7 @@ export default function AdminControl() {
                         disabled={loading}
                       >
                         <option value="">All statuses</option>
+                        <option value="attended">Attended (Present/Late)</option>
                         <option value="present">Present</option>
                         <option value="absent">Absent</option>
                       </select>
