@@ -99,6 +99,18 @@ function formatDateTime(value, { timeZone = "Asia/Manila", assumeTimeZone = "Asi
     });
 }
 
+function parsePhilippineDateTime(value) {
+    if (!value) return null;
+
+    const normalized = String(value).trim().replace(" ", "T");
+    const hasTimeZone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(normalized);
+    const date = new Date(
+        hasTimeZone ? normalized : `${normalized}+08:00`
+    );
+
+    return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function getAnnouncementTimestamp(announcement) {
     const timestamp = Number(announcement.created_at_timestamp);
     if (Number.isFinite(timestamp) && timestamp > 0) return timestamp * 1000;
@@ -319,11 +331,8 @@ export default function Announcements() {
                     throw new Error("Upcoming events were not returned by the server.");
                 }
 
-                const now = Date.now();
                 const availableEvents = rows.filter((event) => {
-                    const start = new Date(
-                        String(event.start_datetime || "").replace(" ", "T")
-                    ).getTime();
+                    const end = parsePhilippineDateTime(event.end_datetime);
                     const eventDeptId =
                         event.dept_id === null || event.dept_id === ""
                             ? null
@@ -341,9 +350,9 @@ export default function Announcements() {
                     return (
                         isManagedEvent &&
                         event.approval_status === "approved" &&
-                        event.status === "upcoming" &&
-                        Number.isFinite(start) &&
-                        start > now
+                        ["upcoming", "ongoing"].includes(event.status) &&
+                        end !== null &&
+                        end.getTime() > Date.now()
                     );
                 });
                 setUpcomingEvents(availableEvents);
@@ -890,9 +899,7 @@ export default function Announcements() {
                                         onChange={handleChange}
                                         disabled={loadingUpcomingEvents || saving}
                                     >
-                                        <option value="">
-                                            No event notification
-                                        </option>
+                                        <option value="">No event notification</option>
                                         {upcomingEvents.map((event) => (
                                             <option
                                                 key={event.event_id}
@@ -903,16 +910,16 @@ export default function Announcements() {
                                         ))}
                                     </select>
                                     <small>
-                                        This emails eligible students when registration opens and sends a start-time reminder to registered students. It also adds a registration alert in the student portal.
+                                        You can send multiple email announcements for an approved event until it ends. Each announcement emails eligible students and adds an event alert in the student portal; registered students receive a start-time reminder.
                                     </small>
                                     {loadingUpcomingEvents && (
-                                        <small>Loading approved upcoming campus events…</small>
+                                        <small>Loading approved active campus events…</small>
                                     )}
                                     {!loadingUpcomingEvents &&
                                         !upcomingEventsError &&
                                         upcomingEvents.length === 0 && (
                                             <small>
-                                                No future, OSSE-approved events are available for your account. Submit an event with a future start time and wait for OSSE approval before linking it here.
+                                                No approved events that are still in progress are available for your account.
                                             </small>
                                         )}
                                     {upcomingEventsError && (

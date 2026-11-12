@@ -163,16 +163,15 @@ class AnnouncementsController extends Controller
                  FROM events
                  WHERE event_id = ?
                    AND approval_status = ?
-                   AND status = ?
-                   AND start_datetime > NOW()
-                   AND end_datetime > NOW()
+                   AND status IN (?, ?)
+                   AND end_datetime > DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR)
                  LIMIT 1',
-                [$eventId, 'approved', 'upcoming']
+                [$eventId, 'approved', 'upcoming', 'ongoing']
             )->fetch(PDO::FETCH_ASSOC);
 
             if (!$event) {
                 $this->api->respond_error(
-                    'Select an approved upcoming event that is still open for registration.',
+                    'Select an approved event that has not ended.',
                     422
                 );
                 return;
