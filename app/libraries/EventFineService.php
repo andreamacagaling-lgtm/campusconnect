@@ -15,7 +15,7 @@ class EventFineService
     {
         return $this->db->raw(
             "INSERT INTO event_fines (event_reg_id, fine_amount, fined_at)
-             SELECT er.event_reg_id, ?, e.start_datetime
+             SELECT er.event_reg_id, ?, e.end_datetime
              FROM event_registrations er
              INNER JOIN events e ON e.event_id = er.event_id
              INNER JOIN event_fine_settings settings
@@ -24,7 +24,7 @@ class EventFineService
              WHERE e.approval_status = 'approved'
                AND e.status <> 'cancelled'
                AND e.start_datetime >= settings.enabled_from
-               AND e.start_datetime <= NOW()
+               AND e.end_datetime <= DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR)
                AND er.registered_at < e.start_datetime
                AND a.attendance_id IS NULL
              ON DUPLICATE KEY UPDATE

@@ -85,7 +85,8 @@ class AttendanceController extends Controller
                 ef.fined_at,
                 CASE
                     WHEN a.attendance_id IS NOT NULL THEN a.status
-                    WHEN NOW() >= e.start_datetime THEN 'absent'
+                    WHEN DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR) >= e.end_datetime
+                        THEN 'absent'
                     ELSE 'not_scanned'
                 END AS attendance_status
             FROM event_registrations er
@@ -130,11 +131,13 @@ class AttendanceController extends Controller
         } elseif ($status === 'attended') {
             $sql .= " AND a.status IN ('present', 'late')";
         } elseif ($status === 'absent') {
-            $sql .= ' AND a.attendance_id IS NULL AND NOW() >= e.start_datetime';
+            $sql .= ' AND a.attendance_id IS NULL
+                      AND DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR) >= e.end_datetime';
         } elseif ($status === 'fined') {
             $sql .= ' AND ef.fine_id IS NOT NULL';
         } elseif ($status === 'not_scanned') {
-            $sql .= ' AND a.attendance_id IS NULL AND NOW() < e.start_datetime';
+            $sql .= ' AND a.attendance_id IS NULL
+                      AND DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR) < e.end_datetime';
         }
 
         $sql .= ' ORDER BY e.start_datetime DESC, u.full_name ASC';
@@ -195,10 +198,12 @@ class AttendanceController extends Controller
                 COALESCE(SUM(a.status = 'present'), 0) AS present_count,
                 COALESCE(SUM(a.status = 'late'), 0) AS late_count,
                 COALESCE(SUM(
-                    a.attendance_id IS NULL AND NOW() >= e.start_datetime
+                    a.attendance_id IS NULL
+                    AND DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR) >= e.end_datetime
                 ), 0) AS absent_count,
                 COALESCE(SUM(
-                    a.attendance_id IS NULL AND NOW() < e.start_datetime
+                    a.attendance_id IS NULL
+                    AND DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR) < e.end_datetime
                 ), 0) AS not_scanned_count
             FROM event_registrations er
             INNER JOIN events e ON e.event_id = er.event_id
@@ -283,6 +288,14 @@ class AttendanceController extends Controller
                 e.start_datetime,
                 e.end_datetime,
                 e.status AS event_status,
+                CASE
+                    WHEN DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR)
+                        < DATE_SUB(e.start_datetime, INTERVAL 1 HOUR)
+                        THEN 'not_open'
+                    WHEN DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR) >= e.end_datetime
+                        THEN 'closed'
+                    ELSE 'open'
+                END AS attendance_window,
                 u.user_id,
                 u.student_no,
                 u.full_name,
@@ -342,19 +355,7 @@ class AttendanceController extends Controller
                 return;
             }
 
-            $now = time();
-            $start = strtotime($registration->start_datetime);
-            $end = strtotime($registration->end_datetime);
-
-            if ($start === false || $end === false) {
-                $this->api->respond_error(
-                    'The event schedule is invalid.',
-                    409
-                );
-                return;
-            }
-
-            if ($now < $start - 3600) {
+            if ($registration->attendance_window === 'not_open') {
                 $this->api->respond_error(
                     'Attendance opens one hour before the event starts.',
                     409
@@ -362,9 +363,9 @@ class AttendanceController extends Controller
                 return;
             }
 
-            if ($now >= $start) {
+            if ($registration->attendance_window === 'closed') {
                 $this->api->respond_error(
-                    'The attendance window closed when the event started.',
+                    'The attendance window closed when the event ended.',
                     409
                 );
                 return;
@@ -395,11 +396,12 @@ class AttendanceController extends Controller
             $insert = $this->run_write(
                 "INSERT INTO attendance
                     (event_reg_id, scanned_by, scanned_at, status)
-                 SELECT ?, ?, NOW(), ?
+                    SELECT ?, ?, NOW(), ?
                  FROM events e
                  WHERE e.event_id = ?
-                   AND NOW() >= DATE_SUB(e.start_datetime, INTERVAL 1 HOUR)
-                   AND NOW() < e.start_datetime",
+                      AND DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR)
+                           >= DATE_SUB(e.start_datetime, INTERVAL 1 HOUR)
+                      AND DATE_ADD(UTC_TIMESTAMP(), INTERVAL 8 HOUR) < e.end_datetime",
                 [
                 (int) $registration->event_reg_id,
                 (int) $user['user_id'],

@@ -269,8 +269,8 @@ student department, year level, and section; department administrators can
 filter by year level and section from their attendance page.
 
 After migration `028_create_event_fines`, attendance scans open one hour before
-an event and close at its start time. Registered students without a scan at
-that time incur one ₱25 unpaid fine for the event. Fines appear in the USG and
+an event and close when it ends. Registered students without a scan by then
+incur one ₱25 unpaid fine for the event. Fines appear in the USG and
 department **Fines Monitoring** pages and are recorded once per registration;
 historical events that started before the migration are not charged. The
 existing `events:send-start-reminders` task also synchronizes due fines every
