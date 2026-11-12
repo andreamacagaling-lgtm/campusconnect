@@ -71,6 +71,24 @@ class EmailService
         }
         require_once $autoload;
 
+        $transport = strtolower(trim((string) (getenv('MAIL_TRANSPORT') ?: 'smtp')));
+        if ($transport === 'resend') {
+            return self::send_via_api(
+                $validRecipients,
+                $invalidCount,
+                $subject,
+                $title,
+                $content
+            );
+        }
+
+        if ($transport !== 'smtp') {
+            return self::failed_delivery(
+                count($validRecipients) + $invalidCount,
+                'MAIL_TRANSPORT must be set to smtp or resend.'
+            );
+        }
+
         $username = trim((string) (getenv('SMTP_USERNAME') ?: getenv('MAIL_USERNAME')));
         $password = (string) (getenv('SMTP_PASSWORD') ?: getenv('MAIL_PASSWORD'));
         $host = trim((string) (getenv('SMTP_HOST') ?: 'smtp.gmail.com'));
@@ -169,6 +187,62 @@ class EmailService
             'sent' => 0,
             'failed' => $failed,
             'message' => $message
+        ];
+    }
+
+    private static function send_via_api(
+        array $recipients,
+        $invalidCount,
+        $subject,
+        $title,
+        $content
+    ) {
+        require_once APP_DIR . 'libraries/EmailApiDelivery.php';
+
+        $safeTitle = htmlspecialchars(
+            (string) $title,
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        );
+        $safeContent = nl2br(htmlspecialchars(
+            (string) $content,
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        ));
+        $html = '<!doctype html><html><body>' .
+            '<h2>CampusConnect</h2><h3>' . $safeTitle . '</h3>' .
+            '<p>' . $safeContent . '</p>' .
+            '<p>Log in to CampusConnect to read the announcement.</p>' .
+            '</body></html>';
+        $text = (string) $title . "\n\n" . (string) $content .
+            "\n\nLog in to CampusConnect to read the announcement.";
+
+        $sent = 0;
+        $failed = $invalidCount;
+        $firstError = null;
+        foreach (array_chunk($recipients, 40) as $batchIndex => $batch) {
+            $error = EmailApiDelivery::send($batch, $subject, $html, $text);
+            if ($error === null) {
+                $sent += count($batch);
+                continue;
+            }
+
+            $failed += count($batch);
+            $firstError = $firstError ?? $error;
+            error_log(
+                'EmailService API batch ' . ($batchIndex + 1) .
+                ' failed: ' . $error
+            );
+        }
+
+        return [
+            'success' => $failed === 0,
+            'sent' => $sent,
+            'failed' => $failed,
+            'message' => $failed === 0
+                ? 'Announcement email sent.'
+                : 'Some announcement emails could not be delivered. ' .
+                    ($firstError ?? 'Check the backend logs.')
         ];
     }
 }

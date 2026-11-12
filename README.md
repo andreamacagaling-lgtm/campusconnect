@@ -349,23 +349,22 @@ flow and notify active student accounts with registered email addresses;
 department announcements are scoped to students in that department.
 Department admins can publish from the Announcements item in their department
 dashboard. The phone and desktop announcement forms use the same
-server-side email delivery flow. Configure `MAIL_USERNAME` and `MAIL_PASSWORD`
-in the deployed backend environment with a Gmail account and its app password.
-Alternatively, set `SMTP_USERNAME` and `SMTP_PASSWORD`; optional `SMTP_HOST`,
-`SMTP_PORT`, `SMTP_ENCRYPTION` (`tls` for port 587 or `ssl` for port 465),
-`SMTP_FROM_EMAIL`, and `SMTP_FROM_NAME` settings customize the mail server and
-sender. Keep credentials out of source control. The announcement remains
-published if email delivery fails; the API reports the delivery result to the
-admin, and server logs contain the SMTP failure details.
+server-side email delivery flow. On Render Free, SMTP ports are blocked, so set
+`MAIL_TRANSPORT=resend`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL` in the
+backend service's Environment settings. Verify the sender domain with Resend
+before sending; use `RESEND_FROM_NAME` to customize its display name. Do not
+put these values in Vercel or commit secrets. Local development can keep using
+`MAIL_TRANSPORT=smtp` with `MAIL_USERNAME` and a Gmail App Password.
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_ENCRYPTION` (`tls` for port 587 or `ssl` for
+port 465), `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, and
+`SMTP_FROM_NAME` customize local SMTP. The announcement remains published if
+email delivery fails; the API reports the delivery result to the admin, and
+server logs contain provider error details.
 
-Event-specific announcement and event-start emails use the same `MAIL_USERNAME`
-and `MAIL_PASSWORD` by default, with Gmail SMTP, port 587, and the sender set
-to `MAIL_USERNAME`. Optional `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
-`SMTP_PASSWORD`, `SMTP_ENCRYPTION` (`tls` for port 587 or `ssl` for port 465),
-`SMTP_FROM_EMAIL`, and `SMTP_FROM_NAME` settings can override those defaults.
-Set `STUDENT_PORTAL_URL` to the frontend's Events page URL to include a direct
-event link in those emails. Keep credentials out of source control and ensure
-the sender address is authorized by the mail provider.
+Event-specific announcement and event-start emails use the selected
+`MAIL_TRANSPORT` too. Set `STUDENT_PORTAL_URL` to the frontend's Events page URL
+to include a direct event link in those emails. Ensure the sender address is
+authorized by the mail provider.
 
 Schedule `php lava events:send-start-reminders` to run every minute. On
 Windows, create a Task Scheduler task that runs `php.exe` with
@@ -373,8 +372,8 @@ Windows, create a Task Scheduler task that runs `php.exe` with
 repeating every minute with the project directory as the working directory.
 On Linux, add `* * * * * cd /path/to/campusconnect && php lava events:send-start-reminders`
 to the crontab. The job only runs from the CLI, records deliveries to prevent
-repeat reminders, synchronizes event absence fines, and retries temporary SMTP
-failures up to five times.
+repeat reminders, synchronizes event absence fines, and retries temporary email
+delivery failures up to five times.
 Registration-open email is sent when the admin publishes the linked event
 announcement; if delivery fails, the announcement remains visible in the
 portal and the admin receives a delivery warning.

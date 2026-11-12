@@ -671,7 +671,10 @@ class AnnouncementsController extends Controller
             $delivery['success'] = $delivery['failed'] === 0;
             $delivery['message'] = $delivery['success']
                 ? 'Registration-open email notifications were sent to eligible students.'
-                : 'Some email notifications could not be delivered.';
+                : (
+                    $delivery['error_message'] ??
+                    'Some email notifications could not be delivered.'
+                );
 
             if (!$delivery['success'] && ($delivery['failed'] ?? 0) > 0) {
                 error_log(

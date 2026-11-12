@@ -159,7 +159,7 @@ class EventStartNotificationService
                         $eventId,
                         $userIds,
                         'pending',
-                        'SMTP delivery failed; will retry up to five times.'
+                        'Email delivery failed; will retry up to five times.'
                     );
                     $failed += count($userIds);
                 }

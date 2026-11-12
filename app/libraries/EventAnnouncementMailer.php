@@ -2,7 +2,6 @@
 
 defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed');
 
-use PHPMailer\PHPMailer\Exception;
 use PHPMailer\PHPMailer\PHPMailer;
 
 class EventAnnouncementMailer
@@ -16,6 +15,11 @@ class EventAnnouncementMailer
     )
     {
         require_once ROOT_DIR . 'vendor/autoload.php';
+
+        $transport = strtolower(trim((string) (getenv('MAIL_TRANSPORT') ?: 'smtp')));
+        if (!in_array($transport, ['smtp', 'resend'], true)) {
+            throw new RuntimeException('MAIL_TRANSPORT must be set to smtp or resend.');
+        }
 
         $username = trim((string) (getenv('SMTP_USERNAME') ?: getenv('MAIL_USERNAME')));
         $password = (string) (getenv('SMTP_PASSWORD') ?: getenv('MAIL_PASSWORD'));
@@ -31,28 +35,29 @@ class EventAnnouncementMailer
         $encryption = strtolower(trim((string) (getenv('SMTP_ENCRYPTION') ?: 'tls')));
         $portalUrlParts = $portalUrl === '' ? false : parse_url($portalUrl);
 
-        if (
+        $invalidPortalUrl = $portalUrl !== '' && (
+            !filter_var($portalUrl, FILTER_VALIDATE_URL) ||
+            !is_array($portalUrlParts) ||
+            !in_array(
+                strtolower((string) ($portalUrlParts['scheme'] ?? '')),
+                ['http', 'https'],
+                true
+            ) ||
+            empty($portalUrlParts['host'])
+        );
+        $invalidSmtpConfig = $transport === 'smtp' && (
             $username === '' ||
             $password === '' ||
             !$port ||
             !filter_var($fromEmail, FILTER_VALIDATE_EMAIL) ||
-            (
-                $portalUrl !== '' &&
-                (
-                    !filter_var($portalUrl, FILTER_VALIDATE_URL) ||
-                    !is_array($portalUrlParts) ||
-                    !in_array(
-                        strtolower((string) ($portalUrlParts['scheme'] ?? '')),
-                        ['http', 'https'],
-                        true
-                    ) ||
-                    empty($portalUrlParts['host'])
-                )
-            ) ||
             !in_array($encryption, ['tls', 'ssl'], true)
-        ) {
+        );
+
+        if ($invalidSmtpConfig || $invalidPortalUrl) {
             throw new RuntimeException(
-                'Mail credentials, sender, encryption, port, and any configured student portal URL must be valid.'
+                $invalidPortalUrl
+                    ? 'The configured student portal URL is invalid.'
+                    : 'SMTP credentials, sender, encryption, or port are invalid.'
             );
         }
 
@@ -80,6 +85,55 @@ class EventAnnouncementMailer
             ];
         }
 
+        $isEventStart = $notificationType === 'event_start';
+        $subject = ($isEventStart ? 'Event is starting: ' : 'Registration is open: ') .
+            $title;
+        $html = $this->build_html(
+            $title,
+            $content,
+            $event,
+            $portalUrl,
+            $isEventStart
+        );
+        $text = $this->build_text(
+            $title,
+            $content,
+            $event,
+            $portalUrl,
+            $isEventStart
+        );
+
+        if ($transport === 'resend') {
+            require_once APP_DIR . 'libraries/EmailApiDelivery.php';
+
+            $sentEmails = [];
+            $failedEmails = [];
+            $firstError = null;
+            foreach (array_chunk($validRecipients, 40) as $batchIndex => $batch) {
+                $error = EmailApiDelivery::send($batch, $subject, $html, $text);
+                if ($error === null) {
+                    $sentEmails = array_merge($sentEmails, $batch);
+                    continue;
+                }
+
+                $firstError = $firstError ?? $error;
+                $failedEmails = array_merge($failedEmails, $batch);
+                error_log(
+                    'EventAnnouncementMailer API batch ' . ($batchIndex + 1) .
+                    ' failed: ' . $error
+                );
+            }
+
+            return [
+                'sent' => count($sentEmails),
+                'failed' => $failed + count($failedEmails),
+                'sent_emails' => $sentEmails,
+                'failed_emails' => $failedEmails,
+                'invalid_emails' => $invalidEmails,
+                'error_message' => $firstError
+            ];
+        }
+
         $mailer = new PHPMailer(true);
         $mailer->isSMTP();
         $mailer->Host = $host;
@@ -95,23 +149,9 @@ class EventAnnouncementMailer
         $mailer->CharSet = PHPMailer::CHARSET_UTF8;
         $mailer->isHTML(true);
         $mailer->setFrom($fromEmail, $fromName);
-        $isEventStart = $notificationType === 'event_start';
-        $mailer->Subject = ($isEventStart ? 'Event is starting: ' : 'Registration is open: ') .
-            $title;
-        $mailer->Body = $this->build_html(
-            $title,
-            $content,
-            $event,
-            $portalUrl,
-            $isEventStart
-        );
-        $mailer->AltBody = $this->build_text(
-            $title,
-            $content,
-            $event,
-            $portalUrl,
-            $isEventStart
-        );
+        $mailer->Subject = $subject;
+        $mailer->Body = $html;
+        $mailer->AltBody = $text;
 
         $sent = 0;
         $sentEmails = [];
@@ -126,7 +166,7 @@ class EventAnnouncementMailer
                 $mailer->send();
                 $sent += count($batch);
                 $sentEmails = array_merge($sentEmails, $batch);
-            } catch (Exception $e) {
+            } catch (\PHPMailer\PHPMailer\Exception $e) {
                 $failed += count($batch);
                 $failedEmails = array_merge($failedEmails, $batch);
                 error_log(
