@@ -71,29 +71,47 @@ class EmailService
         }
         require_once $autoload;
 
-        $username = trim((string) getenv('MAIL_USERNAME'));
-        $password = (string) getenv('MAIL_PASSWORD');
-        if ($username === '' || $password === '') {
-            error_log('EmailService: MAIL_USERNAME and MAIL_PASSWORD must be configured.');
+        $username = trim((string) (getenv('SMTP_USERNAME') ?: getenv('MAIL_USERNAME')));
+        $password = (string) (getenv('SMTP_PASSWORD') ?: getenv('MAIL_PASSWORD'));
+        $host = trim((string) (getenv('SMTP_HOST') ?: 'smtp.gmail.com'));
+        $fromEmail = trim((string) (getenv('SMTP_FROM_EMAIL') ?: $username));
+        $fromName = trim((string) (getenv('SMTP_FROM_NAME') ?: 'CampusConnect'));
+        $port = filter_var(
+            getenv('SMTP_PORT') ?: '587',
+            FILTER_VALIDATE_INT,
+            ['options' => ['min_range' => 1, 'max_range' => 65535]]
+        );
+        $encryption = strtolower(trim((string) (getenv('SMTP_ENCRYPTION') ?: 'tls')));
+
+        if (
+            $username === '' ||
+            $password === '' ||
+            !$port ||
+            !filter_var($fromEmail, FILTER_VALIDATE_EMAIL) ||
+            !in_array($encryption, ['tls', 'ssl'], true)
+        ) {
+            error_log('EmailService: SMTP credentials or mail settings are missing or invalid.');
             return self::failed_delivery(
                 count($validRecipients) + $invalidCount,
-                'Email delivery is not configured.'
+                'Email delivery is not configured correctly. Set valid SMTP credentials and mail settings in the backend environment.'
             );
         }
 
         $mailer = new PHPMailer(true);
         $mailer->isSMTP();
-        $mailer->Host = 'smtp.gmail.com';
+        $mailer->Host = $host;
+        $mailer->Port = $port;
         $mailer->SMTPAuth = true;
         $mailer->Username = $username;
         $mailer->Password = $password;
-        $mailer->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mailer->Port = 587;
+        $mailer->SMTPSecure = $encryption === 'ssl'
+            ? PHPMailer::ENCRYPTION_SMTPS
+            : PHPMailer::ENCRYPTION_STARTTLS;
         $mailer->Timeout = 20;
         $mailer->SMTPKeepAlive = true;
         $mailer->CharSet = PHPMailer::CHARSET_UTF8;
         $mailer->isHTML(true);
-        $mailer->setFrom($username, 'CampusConnect');
+        $mailer->setFrom($fromEmail, $fromName);
 
         $safeTitle = htmlspecialchars(
             (string) $title,
@@ -140,7 +158,7 @@ class EmailService
             'failed' => $failed,
             'message' => $failed === 0
                 ? 'Announcement email sent.'
-                : 'Some announcement emails could not be delivered.'
+                : 'Some announcement emails could not be delivered. Check the backend SMTP settings and server logs.'
         ];
     }
 

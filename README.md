@@ -351,9 +351,12 @@ Department admins can publish from the Announcements item in their department
 dashboard. The phone and desktop announcement forms use the same
 server-side email delivery flow. Configure `MAIL_USERNAME` and `MAIL_PASSWORD`
 in the deployed backend environment with a Gmail account and its app password.
-Keep these credentials out of source control. The announcement remains
+Alternatively, set `SMTP_USERNAME` and `SMTP_PASSWORD`; optional `SMTP_HOST`,
+`SMTP_PORT`, `SMTP_ENCRYPTION` (`tls` for port 587 or `ssl` for port 465),
+`SMTP_FROM_EMAIL`, and `SMTP_FROM_NAME` settings customize the mail server and
+sender. Keep credentials out of source control. The announcement remains
 published if email delivery fails; the API reports the delivery result to the
-admin.
+admin, and server logs contain the SMTP failure details.
 
 Event-specific announcement and event-start emails use the same `MAIL_USERNAME`
 and `MAIL_PASSWORD` by default, with Gmail SMTP, port 587, and the sender set

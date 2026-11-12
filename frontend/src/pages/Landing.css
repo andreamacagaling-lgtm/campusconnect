@@ -18,7 +18,7 @@
   background:
     linear-gradient(90deg, rgba(2, 39, 27, 0.88) 0%, rgba(2, 39, 27, 0.67) 47%, rgba(2, 39, 27, 0.18) 100%),
     linear-gradient(0deg, rgba(2, 39, 27, 0.38), transparent 38%),
-    url("/images/campus-building.jpg") center / cover;
+    url("/images/campus-building-optimized.jpg") center / cover;
   transform: scale(1.01);
 }
 
@@ -178,7 +178,7 @@
     background:
       linear-gradient(90deg, rgba(2, 39, 27, 0.82), rgba(2, 39, 27, 0.52)),
       linear-gradient(0deg, rgba(2, 39, 27, 0.5), transparent 60%),
-      url("/images/campus-building.jpg") 57% center / cover;
+      url("/images/campus-building-optimized.jpg") 57% center / cover;
   }
 
   .landing-brand {

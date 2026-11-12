@@ -245,6 +245,19 @@ export default function AdminAttendanceScanner() {
             </div>
           </div>
           <div className="admin-scanner-actions">
+            {scanResult.event_id && (
+              <button
+                className="admin-scanner-button cancel"
+                type="button"
+                onClick={() =>
+                  navigate(
+                    `/admin/attendance?event_id=${encodeURIComponent(scanResult.event_id)}&status=attended`
+                  )
+                }
+              >
+                View Event Attendance
+              </button>
+            )}
             <button
               className="admin-scanner-button confirm"
               type="button"
