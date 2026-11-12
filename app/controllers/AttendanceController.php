@@ -47,7 +47,9 @@ class AttendanceController extends Controller
             '',
             'present',
             'late',
+            'attended',
             'absent',
+            'fined',
             'not_scanned'
         ], true)) {
             $this->api->respond_error('Invalid attendance status.', 400);
@@ -78,9 +80,12 @@ class AttendanceController extends Controller
                 UNIX_TIMESTAMP(a.scanned_at) AS scanned_at,
                 a.scanned_by,
                 a.status AS recorded_status,
+                ef.fine_id,
+                ef.fine_amount,
+                ef.fined_at,
                 CASE
                     WHEN a.attendance_id IS NOT NULL THEN a.status
-                    WHEN NOW() > e.end_datetime THEN 'absent'
+                    WHEN NOW() >= e.start_datetime THEN 'absent'
                     ELSE 'not_scanned'
                 END AS attendance_status
             FROM event_registrations er
@@ -92,6 +97,7 @@ class AttendanceController extends Controller
                 ON event_department.dept_id = e.dept_id
             LEFT JOIN yr_levels yl ON yl.yr_id = u.yr_id
             LEFT JOIN attendance a ON a.event_reg_id = er.event_reg_id
+            LEFT JOIN event_fines ef ON ef.event_reg_id = er.event_reg_id
             WHERE 1 = 1
         ";
 
@@ -121,15 +127,22 @@ class AttendanceController extends Controller
         if ($status === 'present' || $status === 'late') {
             $sql .= ' AND a.status = ?';
             $params[] = $status;
+        } elseif ($status === 'attended') {
+            $sql .= " AND a.status IN ('present', 'late')";
         } elseif ($status === 'absent') {
-            $sql .= ' AND a.attendance_id IS NULL AND NOW() > e.end_datetime';
+            $sql .= ' AND a.attendance_id IS NULL AND NOW() >= e.start_datetime';
+        } elseif ($status === 'fined') {
+            $sql .= ' AND ef.fine_id IS NOT NULL';
         } elseif ($status === 'not_scanned') {
-            $sql .= ' AND a.attendance_id IS NULL AND NOW() <= e.end_datetime';
+            $sql .= ' AND a.attendance_id IS NULL AND NOW() < e.start_datetime';
         }
 
         $sql .= ' ORDER BY e.start_datetime DESC, u.full_name ASC';
 
         try {
+            require_once APP_DIR . 'libraries/EventFineService.php';
+            (new EventFineService($this->db))->generate_due_fines();
+
             $rows = $this->run_select($sql, $params);
 
             $this->api->respond([
@@ -182,10 +195,10 @@ class AttendanceController extends Controller
                 COALESCE(SUM(a.status = 'present'), 0) AS present_count,
                 COALESCE(SUM(a.status = 'late'), 0) AS late_count,
                 COALESCE(SUM(
-                    a.attendance_id IS NULL AND NOW() > e.end_datetime
+                    a.attendance_id IS NULL AND NOW() >= e.start_datetime
                 ), 0) AS absent_count,
                 COALESCE(SUM(
-                    a.attendance_id IS NULL AND NOW() <= e.end_datetime
+                    a.attendance_id IS NULL AND NOW() < e.start_datetime
                 ), 0) AS not_scanned_count
             FROM event_registrations er
             INNER JOIN events e ON e.event_id = er.event_id
@@ -333,9 +346,25 @@ class AttendanceController extends Controller
             $start = strtotime($registration->start_datetime);
             $end = strtotime($registration->end_datetime);
 
-            if ($start === false || $end === false || $now > $end) {
+            if ($start === false || $end === false) {
                 $this->api->respond_error(
-                    'Attendance is available until the event ends.',
+                    'The event schedule is invalid.',
+                    409
+                );
+                return;
+            }
+
+            if ($now < $start - 3600) {
+                $this->api->respond_error(
+                    'Attendance opens one hour before the event starts.',
+                    409
+                );
+                return;
+            }
+
+            if ($now >= $start) {
+                $this->api->respond_error(
+                    'The attendance window closed when the event started.',
                     409
                 );
                 return;
@@ -361,20 +390,31 @@ class AttendanceController extends Controller
                 return;
             }
 
-            $lateCutoff = $start + (15 * 60);
-            $attendanceStatus = ($now > $lateCutoff) ? 'late' : 'present';
+            $attendanceStatus = 'present';
 
-            $insertSql = "
-                INSERT INTO attendance
+            $insert = $this->run_write(
+                "INSERT INTO attendance
                     (event_reg_id, scanned_by, scanned_at, status)
-                VALUES (?, ?, NOW(), ?)
-            ";
-
-            $this->run_write($insertSql, [
+                 SELECT ?, ?, NOW(), ?
+                 FROM events e
+                 WHERE e.event_id = ?
+                   AND NOW() >= DATE_SUB(e.start_datetime, INTERVAL 1 HOUR)
+                   AND NOW() < e.start_datetime",
+                [
                 (int) $registration->event_reg_id,
                 (int) $user['user_id'],
-                $attendanceStatus
-            ]);
+                    $attendanceStatus,
+                    (int) $registration->event_id
+                ]
+            );
+
+            if (!$insert || $insert->rowCount() !== 1) {
+                $this->api->respond_error(
+                    'The attendance window has closed or has not opened yet.',
+                    409
+                );
+                return;
+            }
 
             $this->api->respond([
                 'success' => true,

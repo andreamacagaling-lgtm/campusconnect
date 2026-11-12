@@ -110,9 +110,12 @@ export default function Register() {
         payload.student_no = form.student_no.trim();
       }
 
-      await api.post("/auth/register", payload);
+      const response = await api.post("/auth/register", payload);
 
-      notifySuccess("Register Successfully");
+      notifySuccess(
+        response.data?.message ||
+          "Registration submitted. Your account is awaiting OSSE approval."
+      );
 
       // Registration does not automatically grant an admin role.
       setTimeout(() => {
@@ -151,6 +154,24 @@ export default function Register() {
         dept_id: form.dept_id || null,
         mode: "auto",
       });
+
+      if (response.data?.approval_pending) {
+        notifySuccess(
+          response.data.message ||
+            "Your account is awaiting OSSE approval."
+        );
+        setPendingGoogleCredential("");
+        setTimeout(() => {
+          navigate("/login", {
+            replace: true,
+            state: {
+              registered: true,
+              email: response.data.email || "",
+            },
+          });
+        }, 1000);
+        return;
+      }
 
       if (!persistAuthSession(response.data)) {
         setError("Invalid response from the server. Please try again.");

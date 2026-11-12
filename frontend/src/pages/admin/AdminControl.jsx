@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { label: "Announcements", path: "/admin/announcements", icon: "▤" },
   { label: "Events", path: "/admin/events", icon: "▦" },
   { label: "Attendance", path: "/admin/attendance", icon: "✓" },
+  { label: "Fines Monitoring", path: "/admin/fines", icon: "₱" },
   { label: "QR Scanner", path: "/admin/scanner", icon: "▣" },
   { label: "Admin Profile", path: "/admin/profile", icon: "◎" },
 ];
@@ -380,7 +381,7 @@ function AdminSidebar({ activePage, user, navigate, onNavigate }) {
 
 export default function AdminControl() {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const user = useMemo(() => getUser(), []);
   const [adminProfile, setAdminProfile] = useState(user);
   const [profileForm, setProfileForm] = useState({
@@ -418,14 +419,30 @@ export default function AdminControl() {
   });
 
   const section = pathname.replace(/\/+$/, "").split("/").pop() || "dashboard";
+  const attendanceQuery = new URLSearchParams(search);
+  const attendanceEventId = attendanceQuery.get("event_id") || "";
+  const attendanceStatus =
+    attendanceQuery.get("status") || (section === "fines" ? "fined" : "");
+  const updateAttendanceQuery = (key, value) => {
+    const query = new URLSearchParams(search);
+    if (value) {
+      query.set(key, value);
+    } else {
+      query.delete(key);
+    }
+    const queryString = query.toString();
+    navigate(`/admin/${section}${queryString ? `?${queryString}` : ""}`);
+  };
   const activePage =
     section === "attendance"
       ? "Attendance"
-      : section === "profile"
-        ? "Admin Profile"
-        : section === "events"
-          ? "Events"
-          : "Dashboard";
+      : section === "fines"
+        ? "Fines Monitoring"
+        : section === "profile"
+          ? "Admin Profile"
+          : section === "events"
+            ? "Events"
+            : "Dashboard";
 
   const attendanceYearOptions = useMemo(() => {
     const years = new Map();
@@ -470,6 +487,14 @@ export default function AdminControl() {
       ),
     [attendance, attendanceSectionId, attendanceYearId]
   );
+  const attendanceFineTotal = useMemo(
+    () =>
+      filteredAttendance.reduce(
+        (total, record) => total + Number(record.fine_amount || 0),
+        0
+      ),
+    [filteredAttendance]
+  );
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -479,25 +504,36 @@ export default function AdminControl() {
     const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
     try {
-      if (section === "attendance") {
-        const [response, departmentsResponse] = await Promise.all([
+      if (section === "attendance" || section === "fines") {
+        const [response, departmentsResponse, eventsResponse] = await Promise.all([
           api.get("/attendance", {
             headers,
-            params: attendanceDepartmentId
-              ? { dept_id: attendanceDepartmentId }
-              : {},
+            params: {
+              ...(attendanceDepartmentId
+                ? { dept_id: attendanceDepartmentId }
+                : {}),
+              ...(attendanceEventId ? { event_id: attendanceEventId } : {}),
+              ...(attendanceStatus ? { status: attendanceStatus } : {}),
+            },
           }),
           api.get("/auth/departments", { headers }),
+          api.get("/events", { headers }),
         ]);
         const rows = response.data?.data;
         const departmentRows = departmentsResponse.data?.data;
-        if (!Array.isArray(rows) || !Array.isArray(departmentRows)) {
+        const eventRows = getRows(eventsResponse.data);
+        if (
+          !Array.isArray(rows) ||
+          !Array.isArray(departmentRows) ||
+          !Array.isArray(eventRows)
+        ) {
           throw new Error(
-            "Attendance records or department options were not returned by the server."
+            "Attendance records, event records, or department options were not returned by the server."
           );
         }
         setAttendance(rows);
         setDepartments(departmentRows);
+        setEvents(sortEventsByRecentActivity(eventRows));
       } else {
         const [eventsResult, announcementsResult] = await Promise.allSettled([
           api.get("/events", { headers }),
@@ -557,7 +593,13 @@ export default function AdminControl() {
     } finally {
       setLoading(false);
     }
-  }, [attendanceDepartmentId, navigate, section]);
+  }, [
+    attendanceDepartmentId,
+    attendanceEventId,
+    attendanceStatus,
+    navigate,
+    section,
+  ]);
 
   useEffect(() => {
     if (!getToken()) {
@@ -597,7 +639,8 @@ export default function AdminControl() {
     if (
       section === "dashboard" ||
       section === "events" ||
-      section === "attendance"
+      section === "attendance" ||
+      section === "fines"
     ) {
       void Promise.resolve().then(loadData);
     }
@@ -1018,19 +1061,51 @@ export default function AdminControl() {
                 <p className="control-empty">No university-wide events found.</p>
               ) : (
                 <div className="control-table-wrap">
-                  <table className="control-table">
+                  <table className="control-table control-events-table">
                     <thead>
-                      <tr><th>Event</th><th>Venue</th><th>Start</th><th>End</th><th>Event status</th><th>Approval</th></tr>
+                      <tr><th>Event</th><th>Venue</th><th>Start</th><th>End</th><th>Event status</th><th>Approval</th><th>Attendance</th></tr>
                     </thead>
                     <tbody>
                       {events.map((event) => (
                         <tr key={event.event_id}>
-                          <td>{event.title}</td>
+                          <td><strong>{event.title}</strong></td>
                           <td>{event.venue || "—"}</td>
                           <td>{displayDate(event.start_datetime)}</td>
                           <td>{displayDate(event.end_datetime)}</td>
-                          <td><span className="control-status">{event.status}</span></td>
-                          <td><span className="control-status">{event.approval_status || "approved"}</span></td>
+                          <td>
+                            <span className={`control-status event-${event.status || "unknown"}`}>
+                              {event.status || "Unknown"}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`control-status approval-${event.approval_status || "approved"}`}>
+                              {event.approval_status || "approved"}
+                            </span>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="control-table-action"
+                              onClick={() =>
+                                navigate(
+                                  `/admin/attendance?event_id=${encodeURIComponent(event.event_id)}&status=attended`
+                                )
+                              }
+                            >
+                              View attendees
+                            </button>
+                            <button
+                              type="button"
+                              className="control-table-action secondary"
+                              onClick={() =>
+                                navigate(
+                                  `/admin/fines?event_id=${encodeURIComponent(event.event_id)}`
+                                )
+                              }
+                            >
+                              View fines
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1040,14 +1115,61 @@ export default function AdminControl() {
             </section>
           )}
 
-          {section === "attendance" && (
+          {(section === "attendance" || section === "fines") && (
             <section className="control-panel">
               <div className="control-panel-heading control-attendance-heading">
                 <div>
-                  <h2>Attendance by department</h2>
-                  <p>{filteredAttendance.length} registration records</p>
+                  <h2>
+                    {section === "fines"
+                      ? attendanceEventId
+                        ? `Event fines — ${events.find((event) => String(event.event_id) === attendanceEventId)?.title || `Event #${attendanceEventId}`}`
+                        : "Fines Monitoring"
+                      : attendanceEventId
+                      ? `Event attendees — ${events.find((event) => String(event.event_id) === attendanceEventId)?.title || `Event #${attendanceEventId}`}`
+                      : "Attendance by department"}
+                  </h2>
+                  <p>
+                    {section === "fines"
+                      ? `${filteredAttendance.length} fine(s) · ₱${attendanceFineTotal.toFixed(2)} total`
+                      : `${filteredAttendance.length} ${
+                          attendanceEventId ? "attendee(s)" : "registration records"
+                        }`}
+                  </p>
                 </div>
                 <div className="control-attendance-actions">
+                  <label className="control-attendance-filter">
+                    <span>Event</span>
+                    <select
+                      value={attendanceEventId}
+                      onChange={(event) =>
+                        updateAttendanceQuery("event_id", event.target.value)
+                      }
+                      disabled={loading}
+                    >
+                      <option value="">All events</option>
+                      {events.map((event) => (
+                        <option key={event.event_id} value={event.event_id}>
+                          {event.title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {section === "attendance" && (
+                    <label className="control-attendance-filter">
+                      <span>Attendance status</span>
+                      <select
+                        value={attendanceStatus}
+                        onChange={(event) =>
+                          updateAttendanceQuery("status", event.target.value)
+                        }
+                        disabled={loading}
+                      >
+                        <option value="">All statuses</option>
+                        <option value="present">Present</option>
+                        <option value="absent">Absent</option>
+                      </select>
+                    </label>
+                  )}
                   <label className="control-attendance-filter">
                     <span>Student department</span>
                     <select
@@ -1112,15 +1234,41 @@ export default function AdminControl() {
                   </button>
                 </div>
               </div>
-              {loading ? (
+              {loading && attendance.length === 0 ? (
                 <p className="control-empty">Loading attendance…</p>
               ) : filteredAttendance.length === 0 ? (
-                <p className="control-empty">No attendance records found.</p>
+                <p className="control-empty">
+                  {loading
+                    ? "Loading attendance…"
+                    : section === "fines"
+                    ? "No fines are due for the selected event and filters."
+                    : attendanceEventId
+                    ? "No attendees found for this event."
+                    : "No attendance records found."}
+                </p>
               ) : (
-                <div className="control-table-wrap">
+                <div
+                  className="control-table-wrap"
+                  aria-busy={loading}
+                >
+                  {loading && (
+                    <p className="control-table-refreshing" role="status">
+                      Refreshing attendance…
+                    </p>
+                  )}
                   <table className="control-table">
                     <thead>
-                      <tr><th>Student</th><th>Student department</th><th>Year level</th><th>Section</th><th>Event</th><th>Event department</th><th>Status</th><th>Scanned</th></tr>
+                      <tr>
+                        <th>Student</th>
+                        <th>Student department</th>
+                        <th>Year level</th>
+                        <th>Section</th>
+                        <th>Event</th>
+                        <th>Event department</th>
+                        <th>Status</th>
+                        {section === "fines" && <><th>Fine</th><th>Fined at</th></>}
+                        <th>Scanned</th>
+                      </tr>
                     </thead>
                     <tbody>
                       {filteredAttendance.map((record) => (
@@ -1132,6 +1280,12 @@ export default function AdminControl() {
                           <td>{record.event_title || "—"}</td>
                           <td>{record.event_dept_name || "University-wide"}</td>
                           <td><span className="control-status">{String(record.attendance_status || "unknown").replace("_", " ")}</span></td>
+                          {section === "fines" && (
+                            <>
+                              <td>₱{Number(record.fine_amount || 0).toFixed(2)}<small>Unpaid</small></td>
+                              <td>{displayDate(record.fined_at || record.start_datetime)}</td>
+                            </>
+                          )}
                           <td>{displayPhilippineDate(record.scanned_at)}</td>
                         </tr>
                       ))}
@@ -1214,7 +1368,7 @@ export default function AdminControl() {
             </>
           )}
 
-          {!["dashboard", "events", "attendance", "profile"].includes(section) && (
+          {!["dashboard", "events", "attendance", "fines", "profile"].includes(section) && (
             <div className="control-empty">This admin page was not found.</div>
           )}
         </section>

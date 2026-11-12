@@ -212,6 +212,11 @@
   border: 1px solid #e3ebe4;
   border-radius: 11px;
   background: #fff;
+  box-sizing: border-box;
+}
+
+.osse-student-accounts-panel {
+  width: 100%;
 }
 
 .osse-panel-heading {
@@ -220,6 +225,45 @@
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
+}
+
+.osse-student-accounts-heading {
+  align-items: flex-end;
+}
+
+.osse-student-accounts-heading > div:first-child {
+  flex: 0 0 auto;
+}
+
+.osse-student-filters {
+  display: grid;
+  flex: 1;
+  grid-template-columns: repeat(4, minmax(130px, 1fr)) auto;
+  align-items: end;
+  justify-content: end;
+  gap: 10px;
+}
+
+.osse-student-filters .osse-department-filter {
+  min-width: 0;
+}
+
+.osse-student-filters > button {
+  min-height: 38px;
+  padding: 9px 14px;
+  border: 1px solid #216b43;
+  border-radius: 7px;
+  background: #216b43;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.osse-student-filters > button:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }
 
 .osse-panel-heading h2 {
@@ -236,6 +280,10 @@
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+}
+
+.osse-student-accounts-panel .osse-table {
+  min-width: 900px;
 }
 
 .osse-table th,
@@ -296,6 +344,170 @@
 .osse-department-groups {
   display: grid;
   gap: 24px;
+}
+
+.osse-content-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.osse-report-dashboard {
+  display: grid;
+  width: 100%;
+  max-width: 1500px;
+  gap: 18px;
+  margin: 0 auto;
+}
+
+.osse-report-welcome {
+  display: flex;
+  min-height: 122px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 26px;
+  border-radius: 12px;
+  background: linear-gradient(120deg, #123c2b, #28764b);
+  color: #fff;
+  box-sizing: border-box;
+}
+
+.osse-report-welcome h2 {
+  margin: 0 0 7px;
+  font-size: 21px;
+}
+
+.osse-report-welcome p {
+  margin: 0;
+  color: #d9e9df;
+  font-size: 12px;
+}
+
+.osse-report-welcome .osse-report-eyebrow {
+  margin-bottom: 8px;
+  color: #b9dfc6;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+}
+
+.osse-report-welcome-icon {
+  color: rgb(255 255 255 / 35%);
+  font-size: 48px;
+}
+
+.osse-status-badge {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 20px;
+  background: #f1f3f1;
+  color: #536157;
+  font-size: 10px;
+  font-weight: 750;
+  text-transform: capitalize;
+}
+
+.osse-status-badge.pending {
+  background: #fff5dd;
+  color: #856214;
+}
+
+.osse-status-badge.active {
+  background: #eaf7ef;
+  color: #216b43;
+}
+
+.osse-status-badge.inactive {
+  background: #fff0f0;
+  color: #9a3030;
+}
+
+.osse-table td button {
+  padding: 8px 11px;
+  border: 1px solid #d5e0d8;
+  border-radius: 7px;
+  background: #fff;
+  color: #214f36;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.osse-table td button.approve {
+  border-color: #216b43;
+  background: #216b43;
+  color: #fff;
+}
+
+.osse-table td button.reject {
+  border-color: #e7cece;
+  color: #9a3030;
+}
+
+.osse-table td button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.osse-population-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.osse-population-card {
+  display: grid;
+  min-height: 148px;
+  justify-items: start;
+  gap: 7px;
+  padding: 18px;
+  border: 1px solid #e3ebe4;
+  border-radius: 11px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.osse-population-card > span {
+  color: #328052;
+  font-size: 20px;
+}
+
+.osse-population-card small {
+  color: #718176;
+  font-size: 12px;
+}
+
+.osse-population-card strong {
+  color: #1e5937;
+  font-size: 26px;
+}
+
+.osse-population-card em {
+  color: #216b43;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.osse-report-table-panel {
+  width: 100%;
+  max-width: none;
+  overflow: hidden;
+  padding: 0;
+}
+
+.osse-report-table-panel .osse-table th,
+.osse-report-table-panel .osse-table td {
+  padding: 13px 18px;
+}
+
+.osse-report-table-panel .osse-table tbody tr:not(.osse-total-row):hover {
+  background: #f7faf7;
+}
+
+.osse-total-row {
+  background: #f7faf7;
 }
 
 .osse-department-heading {
@@ -633,6 +845,14 @@
     flex-direction: column;
   }
 
+  .osse-student-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .osse-student-filters > button {
+    grid-column: 1 / -1;
+  }
+
   .osse-department-filter {
     width: 100%;
   }
@@ -671,5 +891,36 @@
 
   .osse-event-details {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1200px) {
+  .osse-student-accounts-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 900px) {
+  .osse-population-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .osse-student-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .osse-student-filters > button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 420px) {
+  .osse-population-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .osse-student-filters {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

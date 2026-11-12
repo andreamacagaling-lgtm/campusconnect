@@ -365,10 +365,37 @@
   overflow-x: auto;
 }
 
+.control-table-refreshing {
+  margin: 0;
+  padding: 8px 16px;
+  border-bottom: 1px solid #e8eee9;
+  background: #f7faf7;
+  color: #53675a;
+  font-size: 10px;
+}
+
 .control-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+}
+
+.control-events-table {
+  min-width: 980px;
+}
+
+.control-events-table tbody tr:hover {
+  background: #fbfdfb;
+}
+
+.control-events-table td:first-child strong {
+  color: #263d2e;
+  font-weight: 700;
+}
+
+.control-events-table td:last-child {
+  min-width: 190px;
+  white-space: nowrap;
 }
 
 .control-table th,
@@ -404,6 +431,63 @@
   color: #216b43;
   font-size: 9px;
   text-transform: capitalize;
+}
+
+.control-status.event-ongoing,
+.control-status.approval-approved {
+  background: #eaf7ef;
+  color: #216b43;
+}
+
+.control-status.event-upcoming {
+  background: #eaf2ff;
+  color: #356baa;
+}
+
+.control-status.event-completed {
+  background: #f0f2f0;
+  color: #58675e;
+}
+
+.control-status.event-cancelled,
+.control-status.approval-rejected {
+  background: #fff0f0;
+  color: #9a3030;
+}
+
+.control-status.approval-pending {
+  background: #fff5df;
+  color: #8a5b08;
+}
+
+.control-table-action {
+  min-height: 31px;
+  margin: 2px 5px 2px 0;
+  padding: 6px 9px;
+  border: 1px solid #216b43;
+  border-radius: 6px;
+  background: #216b43;
+  color: #fff;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.control-table-action:hover {
+  border-color: #174e31;
+  background: #174e31;
+}
+
+.control-table-action.secondary {
+  border-color: #cfe0d3;
+  background: #fff;
+  color: #216b43;
+}
+
+.control-table-action.secondary:hover {
+  background: #eaf7ef;
 }
 
 .control-empty {

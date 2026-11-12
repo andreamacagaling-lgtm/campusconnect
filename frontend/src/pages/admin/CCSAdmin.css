@@ -470,8 +470,18 @@
 
 .ccs-admin-toolbar {
   display: flex;
+  flex-wrap: wrap;
+  align-items: end;
   gap: 12px;
   padding: 0 22px 20px;
+}
+
+.ccs-admin-toolbar label {
+  display: grid;
+  gap: 6px;
+  color: var(--ccs-admin-muted);
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .ccs-admin-toolbar input,

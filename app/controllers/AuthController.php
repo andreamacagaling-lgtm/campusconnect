@@ -114,7 +114,7 @@ class AuthController extends Controller
                 $passwordHash,
                 'student',
                 (int) $department['dept_id'],
-                'active'
+                'pending'
             ]
         );
 
@@ -137,7 +137,7 @@ class AuthController extends Controller
 
         $this->api->respond(
             [
-                'message' => 'Registration successful.',
+                'message' => 'Registration submitted. Your account is awaiting OSSE approval.',
                 'user' => $user
             ],
             201
@@ -183,6 +183,83 @@ class AuthController extends Controller
         }
 
         $this->respond_login_success($user, $user['dept_id']);
+    }
+
+    public function refresh()
+    {
+        $this->api->require_method('POST');
+        $this->api->rate_limit();
+
+        $input = $this->api->body();
+        $refreshToken = trim((string) ($input['refresh_token'] ?? ''));
+        $claims = $this->api->validate_jwt($refreshToken, 'refresh');
+
+        if (
+            !$claims ||
+            !ctype_digit((string) ($claims['sub'] ?? '')) ||
+            (int) $claims['sub'] < 1 ||
+            empty($claims['jti'])
+        ) {
+            $this->api->respond_error('Invalid refresh token.', 401);
+            return;
+        }
+
+        $refreshKey = (string) config_item('refresh_token_key');
+        $hashedToken = hash_hmac('sha256', $refreshToken, $refreshKey);
+
+        try {
+            $user = $this->db->raw(
+                'SELECT user_id, student_no, full_name, email, role,
+                        admin_type, dept_id, organization_dept_id, status,
+                        section_id, yr_id, created_at
+                 FROM users
+                 WHERE user_id = ?
+                 LIMIT 1',
+                [(int) $claims['sub']]
+            )->fetch(PDO::FETCH_ASSOC);
+
+            if (!$user || $user['status'] !== 'active') {
+                $this->api->respond_error(
+                    'This account is unavailable. Please sign in again.',
+                    401
+                );
+                return;
+            }
+
+            $delete = $this->db->raw(
+                'DELETE FROM refresh_tokens
+                 WHERE user_id = ? AND token = ? AND jti = ?
+                   AND expires_at > NOW()',
+                [
+                    (int) $user['user_id'],
+                    $hashedToken,
+                    $claims['jti']
+                ]
+            );
+
+            if (!$delete || $delete->rowCount() !== 1) {
+                $this->api->respond_error(
+                    'Refresh token expired or already used.',
+                    401
+                );
+                return;
+            }
+
+            $tokens = $this->create_auth_tokens($user);
+            $this->api->respond([
+                'message' => 'Session refreshed.',
+                'access_token' => $tokens['access_token'],
+                'refresh_token' => $tokens['refresh_token'],
+                'token_type' => 'Bearer',
+                'expires_in' => $tokens['expires_in']
+            ]);
+        } catch (Throwable $e) {
+            error_log('AuthController refresh: ' . $e->getMessage());
+            $this->api->respond_error(
+                'Unable to refresh the session right now.',
+                500
+            );
+        }
     }
 
     public function google_login()
@@ -353,7 +430,7 @@ class AuthController extends Controller
                         $passwordHash,
                         'student',
                         $accountDepartmentId,
-                        'active',
+                        'pending',
                         $googleId
                     ]
                 );
@@ -378,6 +455,16 @@ class AuthController extends Controller
                         return;
                     }
 
+                    if ($createdUser['status'] === 'pending') {
+                        $this->api->respond([
+                            'success' => true,
+                            'approval_pending' => true,
+                            'email' => $createdUser['email'],
+                            'message' => 'Google account registered. Your account is awaiting OSSE approval.'
+                        ], 201);
+                        return;
+                    }
+
                     $this->respond_login_success(
                         $createdUser,
                         $accountDepartmentId
@@ -388,7 +475,8 @@ class AuthController extends Controller
                 $this->api->respond([
                     'success' => true,
                     'email' => $email,
-                    'message' => 'Google account verified and registered.'
+                    'approval_pending' => true,
+                    'message' => 'Google account registered. Your account is awaiting OSSE approval.'
                 ], 201);
                 return;
             }
@@ -473,9 +561,17 @@ class AuthController extends Controller
 
     private function respond_login_success($user, $departmentId)
     {
+        if ($user['status'] === 'pending') {
+            $this->api->respond_error(
+                'Your student account is awaiting OSSE approval.',
+                403
+            );
+            return;
+        }
+
         if ($user['status'] !== 'active') {
             $this->api->respond_error(
-                'This account is inactive. Please contact the administrator.',
+                'This account is inactive. Please contact OSSE.',
                 403
             );
             return;
@@ -538,13 +634,35 @@ class AuthController extends Controller
             $user['dept_name'] = $department['dept_name'] ?? null;
         }
 
+        $tokens = $this->create_auth_tokens($user);
+
+        unset($user['google_id']);
+
+        $this->api->respond([
+            'message' => 'Login successful.',
+            'access_token' => $tokens['access_token'],
+            'refresh_token' => $tokens['refresh_token'],
+            'token_type' => 'Bearer',
+            'expires_in' => $tokens['expires_in'],
+            'user' => $user
+        ]);
+    }
+
+    private function create_auth_tokens(array $user)
+    {
+        $accessTtl = max(60, (int) config_item('payload_token_expiration'));
+        $refreshTtl = max(60, (int) config_item('refresh_token_expiration'));
+        $refreshKey = (string) config_item('refresh_token_key');
+        $role = $user['admin_type'] === 'osse'
+            ? 'osse'
+            : ($user['admin_type'] === 'organization'
+                ? 'organization'
+                : $user['role']);
+
         $accessToken = $this->api->encode_jwt([
             'sub' => (string) $user['user_id'],
-            'role' => $user['admin_type'] === 'osse'
-                ? 'osse'
-                : ($user['admin_type'] === 'organization'
-                    ? 'organization'
-                    : $user['role']),
+            'type' => 'access',
+            'role' => $role,
             'admin_type' => $user['admin_type'],
             'dept_id' => $user['dept_id'] === null
                 ? null
@@ -553,17 +671,40 @@ class AuthController extends Controller
                 ($user['organization_dept_id'] ?? null) === null
                     ? null
                     : (int) $user['organization_dept_id']
-        ]);
+        ], $accessTtl);
 
-        unset($user['google_id']);
+        $refreshJti = bin2hex(random_bytes(16));
+        $refreshToken = $this->api->encode_jwt([
+            'sub' => (string) $user['user_id'],
+            'type' => 'refresh',
+            'jti' => $refreshJti
+        ], $refreshTtl);
+        $hashedRefreshToken = hash_hmac(
+            'sha256',
+            $refreshToken,
+            $refreshKey
+        );
+        $expiresAt = date('Y-m-d H:i:s', time() + $refreshTtl);
 
-        $this->api->respond([
-            'message' => 'Login successful.',
+        $this->db->raw(
+            'DELETE FROM refresh_tokens WHERE expires_at <= NOW()'
+        );
+        $this->db->raw(
+            'INSERT INTO refresh_tokens (user_id, token, expires_at, jti)
+             VALUES (?, ?, ?, ?)',
+            [
+                (int) $user['user_id'],
+                $hashedRefreshToken,
+                $expiresAt,
+                $refreshJti
+            ]
+        );
+
+        return [
             'access_token' => $accessToken,
-            'token_type' => 'Bearer',
-            'expires_in' => 900,
-            'user' => $user
-        ]);
+            'refresh_token' => $refreshToken,
+            'expires_in' => $accessTtl
+        ];
     }
 
     public function departments()

@@ -20,8 +20,8 @@ export default function Login() {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const finishLogin = (data) => {
-    const { access_token, user } = data;
-    if (!access_token || !user) {
+    const { access_token, refresh_token, user } = data;
+    if (!access_token || !refresh_token || !user) {
       setError("Invalid response from the server. Please try again.");
       return;
     }
@@ -93,6 +93,13 @@ export default function Login() {
         credential,
         mode: "auto",
       });
+      if (response.data?.approval_pending) {
+        setError(
+          response.data.message ||
+            "Your student account is awaiting OSSE approval."
+        );
+        return;
+      }
       finishLogin(response.data);
     } catch (requestError) {
       const status = requestError.response?.status;

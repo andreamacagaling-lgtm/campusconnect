@@ -216,6 +216,16 @@ Google sign-in verifies the Google ID token on the backend and only signs in
 an existing active CampusConnect account with the same verified email. New
 users should create an account using the registration page first.
 
+### Session persistence
+
+Access tokens are short-lived and refresh automatically while CampusConnect is
+open. The **Remember me** option controls whether session tokens remain after
+the browser is closed; without it they are kept only for the current browser
+tab. Refresh tokens rotate and expire after seven days without use, so a
+reopened app may require signing in again after that period. Explicit logout
+clears the stored session. Apply the existing
+`002_create_refresh_tokens_table` migration before deploying this behavior.
+
 Migration `026_add_google_id_to_users` stores the verified Google account ID
 when a user signs in with Google. The verified Google email is saved to the
 user's `email` field. Existing users are linked on their next successful
@@ -253,6 +263,19 @@ registered for. Editing an approved event sends it through approval again.
 OSSE accounts are limited to reviewing submissions; USG keeps the full-control
 dashboard and attendance tools.
 
+The event lists provide an **Attendance** action for each event. It opens the
+students marked present or late for that event. USG can filter attendees by
+student department, year level, and section; department administrators can
+filter by year level and section from their attendance page.
+
+After migration `028_create_event_fines`, attendance scans open one hour before
+an event and close at its start time. Registered students without a scan at
+that time incur one ₱25 unpaid fine for the event. Fines appear in the USG and
+department **Fines Monitoring** pages and are recorded once per registration;
+historical events that started before the migration are not charged. The
+existing `events:send-start-reminders` task also synchronizes due fines every
+minute. Run that task on the schedule described below.
+
 Students and administrators can upload a JPEG, PNG, or WebP profile photo (up
 to 2000 MB) from their profile page. The student photo appears with their event
 QR ticket and in the authorized event department's scan result; the QR code
@@ -283,8 +306,13 @@ SET admin_type = 'osse'
 WHERE role = 'admin' AND email = 'admin@example.edu';
 ```
 
-The OSSE account signs in through the regular login page and is redirected to
-the event approval queue.
+The OSSE account signs in through the regular login page and can review event
+submissions, approve student registrations, activate/deactivate student
+accounts, and view student population totals by department. Apply migration
+`029_add_student_account_approval` so student registrations use a pending
+status. New student accounts cannot open the Student Portal until OSSE approves
+them; inactive accounts are blocked from student access and can be reactivated
+by OSSE.
 
 The public registration page is for student accounts; its department and
 student ID fields are not used for organization admins. A university admin
@@ -342,7 +370,8 @@ Windows, create a Task Scheduler task that runs `php.exe` with
 repeating every minute with the project directory as the working directory.
 On Linux, add `* * * * * cd /path/to/campusconnect && php lava events:send-start-reminders`
 to the crontab. The job only runs from the CLI, records deliveries to prevent
-repeat reminders, and retries temporary SMTP failures up to five times.
+repeat reminders, synchronizes event absence fines, and retries temporary SMTP
+failures up to five times.
 Registration-open email is sent when the admin publishes the linked event
 announcement; if delivery fails, the announcement remains visible in the
 portal and the admin receives a delivery warning.

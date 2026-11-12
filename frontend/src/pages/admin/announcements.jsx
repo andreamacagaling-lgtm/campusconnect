@@ -23,6 +23,8 @@ const NAV_ITEMS = [
     { label: "Announcements", path: "/admin/announcements", icon: "▤" },
     { label: "Events", path: "/admin/events", icon: "▦" },
     { label: "Attendance", path: "/admin/attendance", icon: "✓" },
+    { label: "Fines Monitoring", path: "/admin/fines", icon: "₱" },
+    { label: "QR Scanner", path: "/admin/scanner", icon: "▣" },
     { label: "Admin Profile", path: "/admin/adminprofile", icon: "◎" },
 ];
 

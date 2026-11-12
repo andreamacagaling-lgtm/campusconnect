@@ -29,6 +29,47 @@ select {
   font: inherit;
 }
 
+.attendance-filter-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.attendance-filter-toolbar label {
+  display: grid;
+  gap: 6px;
+  color: #53645a;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.attendance-filter-toolbar select {
+  min-width: 180px;
+  padding: 9px 11px;
+  border: 1px solid #d5e0d8;
+  border-radius: 7px;
+  background: #fff;
+  color: #20372a;
+}
+
+.attendance-filter-toolbar button {
+  min-height: 37px;
+  padding: 8px 12px;
+  border: 1px solid #cbd9cf;
+  border-radius: 7px;
+  background: #fff;
+  color: #216b43;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.attendance-filter-toolbar button:hover {
+  background: #edf7f0;
+}
+
 button,
 a {
   -webkit-tap-highlight-color: transparent;

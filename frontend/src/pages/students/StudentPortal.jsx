@@ -292,6 +292,7 @@ function EventCard({ event, onRegister, registering }) {
 }
 
 function EventSection({
+  id,
   title,
   description,
   events,
@@ -300,7 +301,7 @@ function EventSection({
   emptyMessage,
 }) {
   return (
-    <section className="student-section">
+    <section id={id} className="student-section student-dashboard-anchor">
       <div className="student-section-heading">
         <div>
           <h2>{title}</h2>
@@ -730,6 +731,25 @@ export default function StudentPortal() {
     event.preventDefault();
     setError("");
     setNotice("");
+
+    const contactNumber = profileForm.contact_number.trim();
+    if (!profile?.avatar) {
+      setError("Upload a profile photo before saving your profile.");
+      return;
+    }
+    if (!/^\d{11}$/.test(contactNumber)) {
+      setError("Contact number is required and must be exactly 11 digits.");
+      return;
+    }
+    if (!profileForm.yr_id) {
+      setError("Please select your year level.");
+      return;
+    }
+    if (!profileForm.section_id) {
+      setError("Please select your section.");
+      return;
+    }
+
     setSavingProfile(true);
 
     try {
@@ -761,6 +781,7 @@ export default function StudentPortal() {
       }
 
       await loadPortal();
+      navigate("/students/home", { replace: true });
       if (cacheUpdateFailed) {
         setError(
           "Profile saved, but the cached account details could not be updated."
@@ -922,18 +943,18 @@ export default function StudentPortal() {
               </section>
 
               <section className="student-overview-stats">
-                <div>
+                <a href="#ongoing-events" aria-label="View ongoing events">
                   <span className="overview-icon green">▦</span>
                   <span><small>Ongoing now</small><strong>{ongoingEvents.length}</strong></span>
-                </div>
-                <div>
+                </a>
+                <a href="#upcoming-events" aria-label="View upcoming events">
                   <span className="overview-icon blue">◷</span>
                   <span><small>Coming up</small><strong>{upcomingEvents.length}</strong></span>
-                </div>
-                <div>
+                </a>
+                <a href="#my-events" aria-label="View my event registrations">
                   <span className="overview-icon orange">✓</span>
                   <span><small>My registrations</small><strong>{myEvents.length}</strong></span>
-                </div>
+                </a>
               </section>
 
               {upcomingEventAnnouncementRows.length > 0 && (
@@ -967,6 +988,7 @@ export default function StudentPortal() {
               )}
 
               <EventSection
+                id="ongoing-events"
                 title="Ongoing Events"
                 description="Events happening on campus right now."
                 events={ongoingEvents}
@@ -975,6 +997,7 @@ export default function StudentPortal() {
                 emptyMessage="No events are happening right now. Check back for what's next."
               />
               <EventSection
+                id="upcoming-events"
                 title="Upcoming Events"
                 description="Plan ahead and reserve your spot."
                 events={upcomingEvents.slice(0, 3)}
@@ -983,7 +1006,7 @@ export default function StudentPortal() {
                 emptyMessage="There are no upcoming events at the moment."
               />
 
-              <section className="student-section">
+              <section id="my-events" className="student-section student-dashboard-anchor">
                 <div className="student-section-heading">
                   <div>
                     <h2>My Events</h2>
@@ -1484,20 +1507,25 @@ export default function StudentPortal() {
                     <strong>{profile.full_name}</strong>
                     <span>{profile.email}</span>
                     <label className="student-avatar-upload">
-                      {uploadingAvatar ? "Uploading photo..." : "Change profile photo"}
+                      {uploadingAvatar
+                        ? "Uploading photo..."
+                        : "Change profile photo *"}
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"
                         onChange={handleAvatarUpload}
                         disabled={uploadingAvatar}
+                        aria-label="Upload required profile photo"
                       />
                     </label>
-                    <small>JPEG, PNG, or WebP; up to 2000 MB.</small>
+                    <small>
+                      Profile photo is required. JPEG, PNG, or WebP; up to 2000 MB.
+                    </small>
                   </div>
                 </div>
                 <div className="student-profile-fields">
                   <label>
-                    Full name
+                    Full name *
                     <input
                       value={profileForm.full_name}
                       onChange={(event) =>
@@ -1528,17 +1556,25 @@ export default function StudentPortal() {
                     <input value={profile.email || ""} readOnly />
                   </label>
                   <label>
-                    Contact number
+                    Contact number *
                     <input
                       type="tel"
                       value={profileForm.contact_number}
                       onChange={(event) =>
                         setProfileForm((current) => ({
                           ...current,
-                          contact_number: event.target.value,
+                          contact_number: event.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 11),
                         }))
                       }
-                      maxLength={20}
+                      placeholder="09XXXXXXXXX"
+                      inputMode="numeric"
+                      pattern="[0-9]{11}"
+                      minLength={11}
+                      maxLength={11}
+                      title="Enter exactly 11 digits."
+                      required
                     />
                   </label>
                   <label>
@@ -1546,7 +1582,7 @@ export default function StudentPortal() {
                     <input value={profile.dept_name || "Not assigned"} readOnly />
                   </label>
                   <label>
-                    Year level
+                    Year level *
                     <select
                       value={profileForm.yr_id}
                       onChange={(event) =>
@@ -1557,6 +1593,7 @@ export default function StudentPortal() {
                         }))
                       }
                       disabled={savingProfile || profileYearOptions.length === 0}
+                      required
                     >
                       <option value="">Select year level</option>
                       {profileYearOptions.map(([yearId, yearName]) => (
@@ -1573,7 +1610,7 @@ export default function StudentPortal() {
                     )}
                   </label>
                   <label>
-                    Section
+                    Section *
                     <select
                       value={profileForm.section_id}
                       onChange={(event) =>
@@ -1587,6 +1624,7 @@ export default function StudentPortal() {
                         !profileForm.yr_id ||
                         profileSectionOptions.length === 0
                       }
+                      required
                     >
                       <option value="">Select section</option>
                       {profileSectionOptions.map((option) => (

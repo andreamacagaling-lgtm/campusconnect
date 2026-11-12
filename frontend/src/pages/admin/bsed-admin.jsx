@@ -189,6 +189,14 @@ function AdminSidebar({
             </button>
             <button
               type="button"
+              className={`bsed-nav-link ${activeSection === "fines" ? "active" : ""}`}
+              onClick={() => navigate(`${route}/fines`)}
+            >
+              <span>₱</span>
+              Fines Monitoring
+            </button>
+            <button
+              type="button"
               className="bsed-nav-link"
               onClick={() => navigate("/admin/scanner")}
             >
@@ -256,11 +264,20 @@ export default function BSEDAdmin() {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceError, setAttendanceError] = useState("");
+  const [attendanceYearFilter, setAttendanceYearFilter] = useState("");
+  const [attendanceSectionFilter, setAttendanceSectionFilter] = useState("");
 
   const user = getUser();
+  const attendanceQuery = new URLSearchParams(location.search);
+  const attendanceEventId = attendanceQuery.get("event_id") || "";
+  const attendanceStatus =
+    attendanceQuery.get("status") ||
+    (location.pathname.endsWith("/fines") ? "fined" : "");
   const activeSection = fullNavigation
-    ? location.pathname.endsWith("/attendance")
-      ? "attendance"
+    ? location.pathname.endsWith("/fines")
+      ? "fines"
+      : location.pathname.endsWith("/attendance")
+        ? "attendance"
       : location.pathname.endsWith("/profile")
         ? "profile"
         : location.pathname.endsWith("/events")
@@ -272,6 +289,50 @@ export default function BSEDAdmin() {
     user?.role === "admin" &&
     user?.admin_type === "department" &&
     Number(user?.dept_id) === departmentId;
+
+  const attendanceYearOptions = useMemo(() => {
+    const years = new Map();
+    attendanceRecords.forEach((record) => {
+      if (record.yr_id !== null && record.yr_id !== "") {
+        years.set(String(record.yr_id), record.yr_name || "Year level");
+      }
+    });
+    return [...years.entries()].sort((left, right) =>
+      left[1].localeCompare(right[1], undefined, { numeric: true })
+    );
+  }, [attendanceRecords]);
+
+  const attendanceSectionOptions = useMemo(() => {
+    const sections = new Map();
+    attendanceRecords.forEach((record) => {
+      if (
+        record.section_id !== null &&
+        record.section_id !== "" &&
+        (!attendanceYearFilter ||
+          String(record.yr_id) === attendanceYearFilter)
+      ) {
+        sections.set(
+          String(record.section_id),
+          record.section_name || "Section"
+        );
+      }
+    });
+    return [...sections.entries()].sort((left, right) =>
+      left[1].localeCompare(right[1], undefined, { numeric: true })
+    );
+  }, [attendanceRecords, attendanceYearFilter]);
+
+  const filteredAttendanceRecords = useMemo(
+    () =>
+      attendanceRecords.filter(
+        (record) =>
+          (!attendanceYearFilter ||
+            String(record.yr_id) === attendanceYearFilter) &&
+          (!attendanceSectionFilter ||
+            String(record.section_id) === attendanceSectionFilter)
+      ),
+    [attendanceRecords, attendanceSectionFilter, attendanceYearFilter]
+  );
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
@@ -342,6 +403,10 @@ export default function BSEDAdmin() {
     try {
       const response = await axios.get(`${API_BASE_URL}/api/attendance`, {
         headers: getHeaders(),
+        params: {
+          ...(attendanceEventId ? { event_id: attendanceEventId } : {}),
+          ...(attendanceStatus ? { status: attendanceStatus } : {}),
+        },
       });
       const records = response.data?.data;
 
@@ -357,7 +422,7 @@ export default function BSEDAdmin() {
     } finally {
       setAttendanceLoading(false);
     }
-  }, []);
+  }, [attendanceEventId, attendanceStatus]);
 
   useEffect(() => {
     if (!getToken()) {
@@ -374,7 +439,11 @@ export default function BSEDAdmin() {
   }, [departmentCode, fetchEvents, fetchOrganizations, isDepartmentAdmin, navigate]);
 
   useEffect(() => {
-    if (fullNavigation && activeSection === "attendance" && isDepartmentAdmin) {
+    if (
+      fullNavigation &&
+      ["attendance", "fines"].includes(activeSection) &&
+      isDepartmentAdmin
+    ) {
       void Promise.resolve().then(fetchAttendance);
     }
   }, [activeSection, fetchAttendance, fullNavigation, isDepartmentAdmin]);
@@ -738,7 +807,9 @@ export default function BSEDAdmin() {
             <h1>
               {activeSection === "dashboard"
                 ? `${departmentCode} Dashboard`
-                : activeSection === "attendance"
+                : activeSection === "fines"
+                  ? `${departmentCode} Fines`
+                  : activeSection === "attendance"
                   ? `${departmentCode} Attendance`
                   : activeSection === "profile"
                     ? "Admin Profile"
@@ -761,14 +832,18 @@ export default function BSEDAdmin() {
               <h2>
                 {activeSection === "dashboard"
                   ? "Dashboard Overview"
-                  : activeSection === "attendance"
+                  : activeSection === "fines"
+                    ? "Fines Monitoring"
+                    : activeSection === "attendance"
                     ? "Attendance Records"
                     : activeSection === "profile"
                       ? "Admin Profile"
                       : "Event Management"}
               </h2>
               <p>
-                {activeSection === "attendance"
+                {activeSection === "fines"
+                  ? `Review unpaid attendance fines for ${departmentName}.`
+                  : activeSection === "attendance"
                   ? `Review attendance for ${departmentName} events.`
                   : activeSection === "profile"
                     ? "View your administrator account information."
@@ -834,12 +909,20 @@ export default function BSEDAdmin() {
             </div>
           )}
 
-          {activeSection === "attendance" ? (
+          {["attendance", "fines"].includes(activeSection) ? (
             <section className="bsed-panel">
               <div className="bsed-panel-heading">
                 <div>
-                  <h3>Attendance Records</h3>
-                  <p>{attendanceRecords.length} record(s) for {departmentCode}</p>
+                  <h3>{activeSection === "fines" ? "Fines Monitoring" : "Attendance Records"}</h3>
+                  <p>
+                    {filteredAttendanceRecords.length}{" "}
+                    {activeSection === "fines"
+                      ? `fine(s) · ₱${filteredAttendanceRecords.reduce((total, record) => total + Number(record.fine_amount || 0), 0).toFixed(2)} total`
+                      : attendanceEventId ? "attendee(s)" : "record(s)"}
+                    {attendanceEventId
+                      ? ` for ${events.find((event) => String(event.event_id) === attendanceEventId)?.title || `event #${attendanceEventId}`}`
+                      : ` for ${departmentCode}`}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -849,6 +932,68 @@ export default function BSEDAdmin() {
                 >
                   {attendanceLoading ? "Refreshing..." : "↻ Refresh"}
                 </button>
+              </div>
+
+              <div className="attendance-filter-toolbar">
+                <label>
+                  Event
+                  <select
+                    value={attendanceEventId}
+                    onChange={(event) => {
+                      const query = event.target.value
+                        ? `?event_id=${encodeURIComponent(event.target.value)}${activeSection === "attendance" ? "&status=attended" : ""}`
+                        : "";
+                      navigate(`${route}/${activeSection}${query}`);
+                    }}
+                    disabled={attendanceLoading}
+                  >
+                    <option value="">All events</option>
+                    {events.map((event) => (
+                      <option key={event.event_id} value={event.event_id}>
+                        {event.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Year level
+                  <select
+                    value={attendanceYearFilter}
+                    onChange={(event) => {
+                      setAttendanceYearFilter(event.target.value);
+                      setAttendanceSectionFilter("");
+                    }}
+                    disabled={attendanceLoading}
+                  >
+                    <option value="">All year levels</option>
+                    {attendanceYearOptions.map(([yearId, yearName]) => (
+                      <option key={yearId} value={yearId}>{yearName}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Section
+                  <select
+                    value={attendanceSectionFilter}
+                    onChange={(event) =>
+                      setAttendanceSectionFilter(event.target.value)
+                    }
+                    disabled={attendanceLoading}
+                  >
+                    <option value="">All sections</option>
+                    {attendanceSectionOptions.map(([sectionId, sectionName]) => (
+                      <option key={sectionId} value={sectionId}>{sectionName}</option>
+                    ))}
+                  </select>
+                </label>
+                {attendanceEventId && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`${route}/${activeSection}`)}
+                  >
+                    {activeSection === "fines" ? "All department fines" : "All event attendance"}
+                  </button>
+                )}
               </div>
 
               {attendanceError && (
@@ -866,24 +1011,29 @@ export default function BSEDAdmin() {
                       <th>Event</th>
                       <th>Year / Section</th>
                       <th>Status</th>
+                      {activeSection === "fines" && <><th>Fine</th><th>Fined At</th></>}
                       <th>Scanned At</th>
                     </tr>
                   </thead>
                   <tbody>
                     {attendanceLoading ? (
                       <tr>
-                        <td colSpan="6" className="bsed-empty">
+                        <td colSpan={activeSection === "fines" ? 8 : 6} className="bsed-empty">
                           Loading attendance records...
                         </td>
                       </tr>
-                    ) : attendanceRecords.length === 0 ? (
+                    ) : filteredAttendanceRecords.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="bsed-empty">
-                          No attendance records found for this department.
+                        <td colSpan={activeSection === "fines" ? 8 : 6} className="bsed-empty">
+                          {activeSection === "fines"
+                            ? "No fines are due for the selected event and filters."
+                            : attendanceEventId
+                            ? "No attendees found for this event."
+                            : `No attendance records found for ${departmentCode}.`}
                         </td>
                       </tr>
                     ) : (
-                      attendanceRecords.map((record) => (
+                      filteredAttendanceRecords.map((record) => (
                         <tr key={record.event_reg_id}>
                           <td>
                             <strong>{record.full_name || "Student"}</strong>
@@ -906,6 +1056,12 @@ export default function BSEDAdmin() {
                                 .replace("_", " ")}
                             </span>
                           </td>
+                          {activeSection === "fines" && (
+                            <>
+                              <td>₱{Number(record.fine_amount || 0).toFixed(2)}<small className="bsed-table-secondary">Unpaid</small></td>
+                              <td>{formatDate(record.fined_at || record.start_datetime)}</td>
+                            </>
+                          )}
                           <td>{formatDate(record.scanned_at)}</td>
                         </tr>
                       ))
@@ -1247,6 +1403,28 @@ export default function BSEDAdmin() {
 
                         <td>
                           <div className="bsed-actions">
+                            <button
+                              type="button"
+                              className="bsed-edit-button"
+                              onClick={() =>
+                                navigate(
+                                  `${route}/attendance?event_id=${encodeURIComponent(event.event_id)}&status=attended`
+                                )
+                              }
+                            >
+                              Attendance
+                            </button>
+                            <button
+                              type="button"
+                              className="bsed-edit-button"
+                              onClick={() =>
+                                navigate(
+                                  `${route}/fines?event_id=${encodeURIComponent(event.event_id)}`
+                                )
+                              }
+                            >
+                              Fines
+                            </button>
                             <button
                               type="button"
                               className="bsed-edit-button"

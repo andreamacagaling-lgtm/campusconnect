@@ -14,9 +14,24 @@ $router->get('status', 'MigrationController::status');
 // Authentication Routes
 $router->post('api/auth/register', 'AuthController::register');
 $router->post('api/auth/login', 'AuthController::login');
+$router->post('api/auth/refresh', 'AuthController::refresh');
 $router->post('api/auth/google', 'AuthController::google_login');
 $router->get('api/auth/departments', 'AuthController::departments');
 $router->get('api/auth/me', 'AuthController::me');
+
+// OSSE student account approvals and reports
+$router->get(
+    'api/admin/osse/students',
+    'StudentAccountsController::index'
+);
+$router->put(
+    'api/admin/osse/students/{id}/status',
+    'StudentAccountsController::update_status'
+);
+$router->get(
+    'api/admin/osse/student-population',
+    'StudentAccountsController::population_report'
+);
 
 // Organization administrator accounts (USG only)
 $router->get(

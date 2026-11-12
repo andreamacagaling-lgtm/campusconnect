@@ -50,6 +50,7 @@ function App() {
         />
         <Route path="/admin/events" element={<AdminControl />} />
         <Route path="/admin/attendance" element={<AdminControl />} />
+        <Route path="/admin/fines" element={<AdminControl />} />
         <Route path="/admin/profile" element={<AdminControl />} />
         <Route
           path="/admin/organization-admins"

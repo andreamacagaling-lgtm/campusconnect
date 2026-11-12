@@ -1,11 +1,15 @@
 export function persistAuthSession(data, rememberMe = false) {
-  const { access_token, user } = data || {};
-  if (!access_token || !user) return false;
+  const { access_token, refresh_token, user } = data || {};
+  if (!access_token || !refresh_token || !user) return false;
 
-  localStorage.setItem("campusconnect_token", access_token);
-  localStorage.setItem("campusconnect_user", JSON.stringify(user));
-  sessionStorage.removeItem("campusconnect_token");
-  sessionStorage.removeItem("campusconnect_user");
+  const storage = rememberMe ? localStorage : sessionStorage;
+  const otherStorage = rememberMe ? sessionStorage : localStorage;
+  storage.setItem("campusconnect_token", access_token);
+  storage.setItem("campusconnect_refresh_token", refresh_token);
+  storage.setItem("campusconnect_user", JSON.stringify(user));
+  otherStorage.removeItem("campusconnect_token");
+  otherStorage.removeItem("campusconnect_refresh_token");
+  otherStorage.removeItem("campusconnect_user");
 
   if (rememberMe) {
     localStorage.setItem("campusconnect_remember", "true");

@@ -235,16 +235,20 @@ class StudentPortalController extends Controller
                 return;
             }
 
+            $start = strtotime((string) $event['start_datetime']);
             $end = strtotime((string) $event['end_datetime']);
 
             if (
                 $event['status'] === 'cancelled' ||
                 $event['status'] === 'completed' ||
+                $event['status'] === 'ongoing' ||
+                $start === false ||
+                $start <= time() ||
                 $end === false ||
                 $end <= time()
             ) {
                 $this->api->respond_error(
-                    'Registration is closed for this event.',
+                    'Registration is closed for this event or has already started.',
                     409
                 );
                 return;
@@ -461,33 +465,39 @@ class StudentPortalController extends Controller
             return;
         }
 
-        if (strlen($contactNumber) > 20) {
+        if ($contactNumber === '') {
             $this->api->respond_error(
-                'Contact number must be 20 characters or fewer.',
+                'Contact number is required.',
                 422
             );
             return;
         }
 
-        if (($yearId === '' || $yearId === null) !==
-            ($sectionId === '' || $sectionId === null)) {
+        if (!preg_match('/^[0-9]{11}$/D', $contactNumber)) {
             $this->api->respond_error(
-                'Choose both a year level and section.',
+                'Contact number must be exactly 11 digits.',
                 422
             );
             return;
         }
-
-        $yearId = ($yearId === '' || $yearId === null)
-            ? null
-            : (string) $yearId;
-        $sectionId = ($sectionId === '' || $sectionId === null)
-            ? null
-            : (string) $sectionId;
 
         if (
-            ($yearId !== null && !$this->valid_positive_id($yearId)) ||
-            ($sectionId !== null && !$this->valid_positive_id($sectionId))
+            $yearId === '' || $yearId === null ||
+            $sectionId === '' || $sectionId === null
+        ) {
+            $this->api->respond_error(
+                'Year level and section are required.',
+                422
+            );
+            return;
+        }
+
+        $yearId = (string) $yearId;
+        $sectionId = (string) $sectionId;
+
+        if (
+            !$this->valid_positive_id($yearId) ||
+            !$this->valid_positive_id($sectionId)
         ) {
             $this->api->respond_error(
                 'Choose a valid year level and section.',
@@ -497,34 +507,48 @@ class StudentPortalController extends Controller
         }
 
         try {
-            if ($yearId !== null && $sectionId !== null) {
-                $validSection = $this->db->raw(
-                    'SELECT s.section_id
-                     FROM sections s
-                     INNER JOIN users u ON u.user_id = ?
-                     LEFT JOIN sections current_section
-                        ON current_section.section_id = u.section_id
-                     WHERE s.section_id = ?
-                       AND s.yr_id = ?
-                       AND s.dept_id = COALESCE(
-                            u.dept_id,
-                            current_section.dept_id
-                       )
-                     LIMIT 1',
-                    [
-                        (int) $student['user_id'],
-                        (int) $sectionId,
-                        (int) $yearId
-                    ]
-                )->fetch(PDO::FETCH_ASSOC);
+            $profile = $this->db->raw(
+                'SELECT avatar
+                 FROM student_profiles
+                 WHERE user_id = ?
+                 LIMIT 1',
+                [(int) $student['user_id']]
+            )->fetch(PDO::FETCH_ASSOC);
 
-                if (!$validSection) {
-                    $this->api->respond_error(
-                        'The selected section does not match your department and year level.',
-                        422
-                    );
-                    return;
-                }
+            if (!$profile || trim((string) ($profile['avatar'] ?? '')) === '') {
+                $this->api->respond_error(
+                    'A profile photo is required before saving your profile.',
+                    422
+                );
+                return;
+            }
+
+            $validSection = $this->db->raw(
+                'SELECT s.section_id
+                 FROM sections s
+                 INNER JOIN users u ON u.user_id = ?
+                 LEFT JOIN sections current_section
+                    ON current_section.section_id = u.section_id
+                 WHERE s.section_id = ?
+                   AND s.yr_id = ?
+                   AND s.dept_id = COALESCE(
+                        u.dept_id,
+                        current_section.dept_id
+                   )
+                 LIMIT 1',
+                [
+                    (int) $student['user_id'],
+                    (int) $sectionId,
+                    (int) $yearId
+                ]
+            )->fetch(PDO::FETCH_ASSOC);
+
+            if (!$validSection) {
+                $this->api->respond_error(
+                    'The selected section does not match your department and year level.',
+                    422
+                );
+                return;
             }
 
             $this->db->raw(
@@ -534,8 +558,8 @@ class StudentPortalController extends Controller
                 [
                     $fullName,
                     $studentNo === '' ? null : $studentNo,
-                    $yearId === null ? null : (int) $yearId,
-                    $sectionId === null ? null : (int) $sectionId,
+                    (int) $yearId,
+                    (int) $sectionId,
                     (int) $student['user_id']
                 ]
             );
@@ -554,7 +578,7 @@ class StudentPortalController extends Controller
                      SET contact_number = ?
                      WHERE user_id = ?',
                     [
-                        $contactNumber === '' ? null : $contactNumber,
+                        $contactNumber,
                         (int) $student['user_id']
                     ]
                 );
@@ -564,7 +588,7 @@ class StudentPortalController extends Controller
                      VALUES (?, ?)',
                     [
                         (int) $student['user_id'],
-                        $contactNumber === '' ? null : $contactNumber
+                        $contactNumber
                     ]
                 );
             }

@@ -30,6 +30,19 @@ class EventNotificationsController extends Controller
 
         $failed = false;
         try {
+            require_once APP_DIR . 'libraries/EventFineService.php';
+            (new EventFineService($this->db))->generate_due_fines();
+            fwrite(STDOUT, "Absence fines synchronized.\n");
+        } catch (Throwable $e) {
+            $failed = true;
+            error_log(
+                'EventNotificationsController process_event_fines: ' .
+                $e->getMessage()
+            );
+            fwrite(STDERR, "Unable to synchronize absence fines.\n");
+        }
+
+        try {
             require_once APP_DIR . 'libraries/EventStartNotificationService.php';
             $service = new EventStartNotificationService($this->db);
             $result = $service->send_due_notifications();
