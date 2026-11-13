@@ -29,14 +29,18 @@ class EventAnnouncementMailer
 
         $username = trim((string) (getenv('SMTP_USERNAME') ?: getenv('MAIL_USERNAME')));
         $password = (string) (getenv('SMTP_PASSWORD') ?: getenv('MAIL_PASSWORD'));
-        $host = trim((string) (getenv('SMTP_HOST') ?: 'smtp.gmail.com'));
+        $host = trim((string) (
+            getenv('SMTP_HOST') ?: getenv('MAIL_HOST') ?: 'smtp.gmail.com'
+        ));
         $fromEmail = trim((string) (getenv('SMTP_FROM_EMAIL') ?: $username));
-        $fromName = trim((string) (getenv('SMTP_FROM_NAME') ?: 'CampusConnect'));
+        $fromName = trim((string) (
+            getenv('SMTP_FROM_NAME') ?: getenv('MAIL_FROM_NAME') ?: 'CampusConnect'
+        ));
 
         $portalUrl = rtrim(trim((string) getenv('STUDENT_PORTAL_URL')), '/');
 
         $port = filter_var(
-            getenv('SMTP_PORT') ?: '587',
+            getenv('SMTP_PORT') ?: getenv('MAIL_PORT') ?: '587',
             FILTER_VALIDATE_INT,
             ['options' => ['min_range' => 1, 'max_range' => 65535]]
         );
