@@ -1,4 +1,3 @@
-
 <?php
 
 defined('PREVENT_DIRECT_ACCESS') OR exit('No direct script access allowed');
@@ -143,11 +142,9 @@ class AnnouncementsController extends Controller
         }
 
         $event = null;
-
         if ($eventId !== null) {
             $adminType = $user['admin_type'] ?? null;
             $adminDeptId = $user['dept_id'] ?? null;
-
             if (
                 !in_array($adminType, ['usg', 'department'], true) ||
                 ($adminType === 'usg' && !empty($adminDeptId)) ||
@@ -183,7 +180,6 @@ class AnnouncementsController extends Controller
             $eventDeptId = $event['dept_id'] === null
                 ? null
                 : (int) $event['dept_id'];
-
             if (
                 ($adminType === 'usg' && $eventDeptId !== null) ||
                 (
@@ -224,9 +220,7 @@ class AnnouncementsController extends Controller
                 return;
             }
 
-            // Send event-specific notification first.
             $eventEmailNotification = null;
-
             if ($event !== null) {
                 $eventEmailNotification = $this->notify_students_about_event(
                     $announcementId,
@@ -236,7 +230,6 @@ class AnnouncementsController extends Controller
                 );
             }
 
-            // Avoid sending the same notification twice.
             $emailNotification = $this->notify_registered_accounts(
                 $announcementId,
                 $title,
@@ -245,7 +238,6 @@ class AnnouncementsController extends Controller
                 $eventEmailNotification['sent_emails'] ?? []
             );
 
-            // Remove internal recipient lists from the API response.
             if ($eventEmailNotification !== null) {
                 unset(
                     $eventEmailNotification['sent_emails'],
@@ -254,48 +246,20 @@ class AnnouncementsController extends Controller
                 );
             }
 
-            /*
-             * BUILD RESPONSE MESSAGE
-             */
-            if (
-                $emailNotification['success'] &&
-                $emailNotification['sent'] > 0
-            ) {
+            if ($emailNotification['success'] && $emailNotification['sent'] > 0) {
                 $message = 'Announcement published and emailed to ' .
                     $emailNotification['sent'] .
                     ' active student email account(s).';
-
-            } elseif (
-                $emailNotification['success'] &&
-                $eventEmailNotification === null
-            ) {
-                $message = 'Announcement published and email notifications were processed successfully.';
-
-            } elseif (
-                $emailNotification['success'] &&
-                $eventEmailNotification !== null &&
-                !empty($eventEmailNotification['success'])
-            ) {
-                $message = 'Announcement published and event email notifications were sent successfully.';
-
-            } elseif (
-                $emailNotification['success'] &&
-                $eventEmailNotification !== null
-            ) {
-                $message = 'Announcement published, but some event email notifications could not be confirmed.';
-
-            } elseif (($emailNotification['failed'] ?? 0) === 0) {
-                $message = 'Announcement published; no additional active student email accounts required notification.';
-
-            } elseif (($emailNotification['sent'] ?? 0) > 0) {
+            } elseif ($emailNotification['success']) {
+                $message = 'Announcement published; active student email accounts already received the event notification.';
+            } elseif ($emailNotification['failed'] === 0) {
+                $message = 'Announcement published, but no active student email accounts were found in the target audience.';
+            } elseif ($emailNotification['sent'] > 0) {
                 $message = 'Announcement published; email was sent to ' .
-                    $emailNotification['sent'] .
-                    ' active student email account(s), but ' .
-                    $emailNotification['failed'] .
-                    ' notification(s) failed.';
-
+                    $emailNotification['sent'] . ' active student email account(s), but ' .
+                    $emailNotification['failed'] . ' notification(s) failed.';
             } else {
-                $message = 'Announcement published, but the server could not confirm email delivery.';
+                $message = 'Announcement published, but Google account email notifications could not be sent.';
             }
 
             $this->api->respond([
@@ -480,7 +444,6 @@ class AnnouncementsController extends Controller
     private function require_admin()
     {
         $claims = $this->api->require_jwt();
-
         if (!is_array($claims) || !$this->valid_id($claims['sub'] ?? null)) {
             $this->api->respond_error('Invalid authentication token.', 401);
             return null;
@@ -517,7 +480,6 @@ class AnnouncementsController extends Controller
         }
 
         $user['sub'] = (int) $user['user_id'];
-
         $user['dept_id'] = $user['dept_id'] === null
             ? null
             : (int) $user['dept_id'];
@@ -547,7 +509,9 @@ class AnnouncementsController extends Controller
             return null;
         }
 
-        if ($viewer['status'] !== 'active') {
+        if (
+            $viewer['status'] !== 'active'
+        ) {
             $this->api->respond_error('Active account required.', 403);
             return null;
         }
@@ -570,7 +534,6 @@ class AnnouncementsController extends Controller
             $viewer['dept_id'] = $viewer['dept_id'] === null
                 ? null
                 : (int) $viewer['dept_id'];
-
             return $viewer;
         }
 
@@ -578,7 +541,6 @@ class AnnouncementsController extends Controller
             $viewer['dept_id'] = $viewer['student_dept_id'] === null
                 ? null
                 : (int) $viewer['student_dept_id'];
-
             return $viewer;
         }
 
@@ -688,7 +650,6 @@ class AnnouncementsController extends Controller
                 error_log(
                     'AnnouncementsController notify_students_about_event: No active students have email addresses.'
                 );
-
                 return [
                     'success' => false,
                     'sent' => 0,
@@ -699,9 +660,7 @@ class AnnouncementsController extends Controller
             }
 
             require_once APP_DIR . 'libraries/EventAnnouncementMailer.php';
-
             $mailer = new EventAnnouncementMailer();
-
             $delivery = $mailer->send(
                 $title,
                 $content,
@@ -709,36 +668,23 @@ class AnnouncementsController extends Controller
                 $recipients,
                 'registration_open'
             );
-
-            // Require at least one successful delivery and zero failures.
-            $delivery['success'] = (
-                ($delivery['failed'] ?? 0) === 0 &&
-                ($delivery['sent'] ?? 0) > 0
-            );
-
+            $delivery['success'] = $delivery['failed'] === 0;
             $delivery['message'] = $delivery['success']
                 ? 'Registration-open email notifications were sent to eligible students.'
                 : (
                     $delivery['error_message'] ??
-                    'Some event email notifications could not be delivered.'
+                    'Some email notifications could not be delivered.'
                 );
 
-            if (!$delivery['success']) {
-                error_log(
-                    'EVENT EMAIL DELIVERY DETAILS: ' .
-                    json_encode($delivery)
-                );
-
+            if (!$delivery['success'] && ($delivery['failed'] ?? 0) > 0) {
                 error_log(
                     'AnnouncementsController notify_students_about_event: ' .
-                    ($delivery['failed'] ?? 0) .
-                    ' student email(s) failed for announcement ' .
+                    $delivery['failed'] . ' student email(s) failed for announcement ' .
                     (int) $announcementId . '.'
                 );
             }
 
             return $delivery;
-
         } catch (Throwable $e) {
             error_log(
                 'AnnouncementsController notify_students_about_event: ' .
@@ -750,7 +696,7 @@ class AnnouncementsController extends Controller
                 'sent' => 0,
                 'failed' => null,
                 'sent_emails' => [],
-                'message' => 'SMTP email delivery failed. Check the SMTP host, credentials, port, and deployed backend settings.'
+                'message' => 'Check the SMTP settings in the server environment.'
             ];
         }
     }
@@ -793,7 +739,6 @@ class AnnouncementsController extends Controller
             }
 
             require_once APP_DIR . 'services/EmailService.php';
-
             $delivery = EmailService::sendEmails(
                 $recipients,
                 'New announcement: ' . $title,
@@ -802,22 +747,15 @@ class AnnouncementsController extends Controller
                 $alreadyNotified
             );
 
-            if (empty($delivery['success'])) {
-                error_log(
-                    'GENERAL EMAIL DELIVERY DETAILS: ' .
-                    json_encode($delivery)
-                );
-
+            if (!$delivery['success']) {
                 error_log(
                     'AnnouncementsController notify_registered_accounts: ' .
-                    ($delivery['failed'] ?? 0) .
-                    ' email(s) failed for announcement ' .
+                    $delivery['failed'] . ' email(s) failed for announcement ' .
                     (int) $announcementId . '.'
                 );
             }
 
             return $delivery;
-
         } catch (Throwable $e) {
             error_log(
                 'AnnouncementsController notify_registered_accounts: ' .
