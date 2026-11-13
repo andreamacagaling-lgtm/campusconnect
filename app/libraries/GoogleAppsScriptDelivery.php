@@ -22,12 +22,30 @@ class GoogleAppsScriptDelivery
             return 'Google Apps Script configuration is incomplete.';
         }
 
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
+        $urlParts = parse_url($url);
+        $validUrl = filter_var($url, FILTER_VALIDATE_URL) &&
+            is_array($urlParts) &&
+            strtolower((string) ($urlParts['scheme'] ?? '')) === 'https' &&
+            strtolower((string) ($urlParts['host'] ?? '')) === 'script.google.com' &&
+            preg_match(
+                '#^/macros/s/[^/]+/exec/?$#',
+                (string) ($urlParts['path'] ?? '')
+            ) === 1;
+
+        if (!$validUrl) {
             error_log(
-                'GoogleAppsScriptDelivery: Invalid Apps Script URL.'
+                'GoogleAppsScriptDelivery: URL must be a deployed Apps Script Web App URL ending in /macros/s/{deployment-id}/exec.'
             );
 
-            return 'Invalid Google Apps Script URL.';
+            return 'The Google Apps Script URL is invalid. Copy the deployed Web App URL ending in /exec.';
+        }
+
+        if (filter_var($secret, FILTER_VALIDATE_URL)) {
+            error_log(
+                'GoogleAppsScriptDelivery: The configured shared secret is a URL, not a secret string.'
+            );
+
+            return 'GOOGLE_APPS_SCRIPT_SECRET must be the shared secret string configured in Apps Script, not a URL.';
         }
 
         if (!function_exists('curl_init')) {
@@ -169,7 +187,7 @@ class GoogleAppsScriptDelivery
                 substr((string) $response, 0, 1000)
             );
 
-            return 'Invalid response from Google Apps Script.';
+            return 'Google Apps Script did not return JSON. Confirm that the URL is a deployed Web App ending in /exec and that access is allowed for the backend.';
         }
 
         /*

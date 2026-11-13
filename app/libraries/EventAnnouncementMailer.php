@@ -13,8 +13,6 @@ class EventAnnouncementMailer
         array $recipients,
         $notificationType = 'registration_open'
     ) {
-        require_once ROOT_DIR . 'vendor/autoload.php';
-
         $transport = strtolower(trim((string) (getenv('MAIL_TRANSPORT') ?: 'smtp')));
 
         if (!in_array(
@@ -75,6 +73,18 @@ class EventAnnouncementMailer
                     ? 'The configured student portal URL is invalid.'
                     : 'SMTP credentials, sender, encryption, or port are invalid.'
             );
+        }
+
+        if ($transport !== 'google_apps_script') {
+            $autoload = ROOT_DIR . 'vendor/autoload.php';
+
+            if (!is_file($autoload)) {
+                throw new RuntimeException(
+                    'Composer dependencies are missing from the backend.'
+                );
+            }
+
+            require_once $autoload;
         }
 
         $validRecipients = [];

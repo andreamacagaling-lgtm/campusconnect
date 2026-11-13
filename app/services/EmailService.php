@@ -61,17 +61,28 @@ class EmailService
             ];
         }
 
+        $transport = strtolower(trim((string) (getenv('MAIL_TRANSPORT') ?: 'smtp')));
+
+        if ($transport === 'google_apps_script') {
+            return self::send_via_google_apps_script(
+                $validRecipients,
+                $invalidCount,
+                $subject,
+                $title,
+                $content
+            );
+        }
+
         $autoload = ROOT_DIR . 'vendor/autoload.php';
         if (!is_file($autoload)) {
             error_log('EmailService: Composer autoload file was not found.');
             return self::failed_delivery(
                 count($validRecipients) + $invalidCount,
-                'Email delivery is unavailable.'
+                'Email delivery is unavailable because the backend Composer dependencies are missing.'
             );
         }
         require_once $autoload;
 
-        $transport = strtolower(trim((string) (getenv('MAIL_TRANSPORT') ?: 'smtp')));
         if ($transport === 'resend') {
             return self::send_via_api(
                 $validRecipients,
@@ -84,16 +95,6 @@ class EmailService
 
         if ($transport === 'gmail_api') {
             return self::send_via_gmail_api(
-                $validRecipients,
-                $invalidCount,
-                $subject,
-                $title,
-                $content
-            );
-        }
-
-        if ($transport === 'google_apps_script') {
-            return self::send_via_google_apps_script(
                 $validRecipients,
                 $invalidCount,
                 $subject,
