@@ -8,8 +8,8 @@ WORKDIR /var/www/html
  
 # Install PHP extensions required by the application and Composer.
 RUN apt-get update \
-&& apt-get install -y --no-install-recommends libzip-dev \
-&& docker-php-ext-install pdo pdo_mysql zip \
+&& apt-get install -y --no-install-recommends libzip-dev libcurl4-openssl-dev \
+&& docker-php-ext-install pdo pdo_mysql zip curl \
 && rm -rf /var/lib/apt/lists/*
  
 # Enable Apache mod_rewrite

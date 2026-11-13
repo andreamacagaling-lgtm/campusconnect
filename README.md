@@ -366,6 +366,12 @@ Local development can keep using `MAIL_TRANSPORT=smtp` with `MAIL_USERNAME` and
 a Gmail App Password.
 Alternatively, Render Free can use `MAIL_TRANSPORT=resend` with a verified
 Resend sender domain. Do not commit provider secrets.
+Google Apps Script is another Render-compatible option: set
+`MAIL_TRANSPORT=google_apps_script`, `GOOGLE_APPS_SCRIPT_URL` to the deployed
+Web App URL ending in `/exec`, and `GOOGLE_APPS_SCRIPT_SECRET` to the same
+shared secret configured in the script. Set these in the Render backend's
+Environment settings, not Vercel; the backend Docker image requires PHP cURL
+for this transport.
 `SMTP_HOST`, `SMTP_PORT`, `SMTP_ENCRYPTION` (`tls` for port 587 or `ssl` for
 port 465), `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, and
 `SMTP_FROM_NAME` customize local SMTP. The announcement remains published if
