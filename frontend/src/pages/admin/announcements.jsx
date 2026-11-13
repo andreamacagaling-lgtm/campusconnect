@@ -497,7 +497,7 @@ export default function Announcements() {
                 );
             } else if (!response.data?.email_notification) {
                 setError(
-                    "Announcement published, but the server did not confirm email delivery. Check the deployed backend and SMTP settings."
+                    "Announcement published, but the server did not confirm email delivery. Check the deployed backend email settings."
                 );
             } else {
                 notifySuccess(

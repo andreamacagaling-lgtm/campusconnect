@@ -202,7 +202,7 @@ class EmailService
             'failed' => $failed,
             'message' => $failed === 0
                 ? 'Announcement email sent.'
-                : 'Some announcement emails could not be delivered. Check the backend SMTP settings and server logs.'
+                : 'Some announcement emails could not be delivered. Check the backend email transport settings and server logs.'
         ];
     }
 
