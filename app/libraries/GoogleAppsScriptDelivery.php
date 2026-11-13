@@ -23,6 +23,7 @@ class GoogleAppsScriptDelivery
         }
 
         $urlParts = parse_url($url);
+
         $validUrl = filter_var($url, FILTER_VALIDATE_URL) &&
             is_array($urlParts) &&
             strtolower((string) ($urlParts['scheme'] ?? '')) === 'https' &&
@@ -72,7 +73,6 @@ class GoogleAppsScriptDelivery
             return 'No valid email recipients were provided.';
         }
 
-        
         $subject = trim((string) $subject);
         $html = trim((string) $html);
         $text = trim((string) $text);
@@ -155,7 +155,12 @@ class GoogleAppsScriptDelivery
             CURLINFO_HTTP_CODE
         );
 
-        curl_close($ch);
+        /*
+         * PHP 8.5 FIX:
+         * Removed curl_close($ch).
+         * The cURL handle is automatically released when
+         * it is no longer referenced.
+         */
 
         if ($response === false) {
             error_log(
