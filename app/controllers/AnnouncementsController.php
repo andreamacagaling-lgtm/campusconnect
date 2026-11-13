@@ -149,8 +149,8 @@ class AnnouncementsController extends Controller
             $adminDeptId = $user['dept_id'] ?? null;
 
             if (
-                !in_array($adminType, ['usg', 'department'], true) ||
-                ($adminType === 'usg' && !empty($adminDeptId)) ||
+                !in_array($adminType, ['usg', 'department', 'osse'], true) ||
+                (in_array($adminType, ['usg', 'osse'], true) && !empty($adminDeptId)) ||
                 ($adminType === 'department' && empty($adminDeptId))
             ) {
                 $this->api->respond_error(
@@ -185,7 +185,7 @@ class AnnouncementsController extends Controller
                 : (int) $event['dept_id'];
 
             if (
-                ($adminType === 'usg' && $eventDeptId !== null) ||
+                (in_array($adminType, ['usg', 'osse'], true) && $eventDeptId !== null) ||
                 (
                     $adminType === 'department' &&
                     $eventDeptId !== (int) $adminDeptId
@@ -498,9 +498,9 @@ class AnnouncementsController extends Controller
             !is_array($user) ||
             $user['role'] !== 'admin' ||
             $user['status'] !== 'active' ||
-            !in_array($user['admin_type'], ['usg', 'department'], true) ||
+            !in_array($user['admin_type'], ['usg', 'department', 'osse'], true) ||
             (
-                $user['admin_type'] === 'usg' &&
+                in_array($user['admin_type'], ['usg', 'osse'], true) &&
                 $user['dept_id'] !== null
             ) ||
             (
@@ -554,10 +554,10 @@ class AnnouncementsController extends Controller
 
         if (
             $viewer['role'] === 'admin' &&
-            in_array($viewer['admin_type'], ['usg', 'department'], true)
+            in_array($viewer['admin_type'], ['usg', 'department', 'osse'], true)
         ) {
             if (
-                ($viewer['admin_type'] === 'usg' && $viewer['dept_id'] !== null) ||
+                (in_array($viewer['admin_type'], ['usg', 'osse'], true) && $viewer['dept_id'] !== null) ||
                 (
                     $viewer['admin_type'] === 'department' &&
                     (int) $viewer['dept_id'] < 1
@@ -597,7 +597,7 @@ class AnnouncementsController extends Controller
                 ];
         }
 
-        if ($viewer['admin_type'] === 'usg') {
+        if (in_array($viewer['admin_type'], ['usg', 'osse'], true)) {
             return ['a.dept_id IS NULL', []];
         }
 
@@ -610,7 +610,7 @@ class AnnouncementsController extends Controller
             ? null
             : (int) $announcement['dept_id'];
 
-        if ($user['admin_type'] === 'usg') {
+        if (in_array($user['admin_type'], ['usg', 'osse'], true)) {
             return $announcementDeptId === null;
         }
 

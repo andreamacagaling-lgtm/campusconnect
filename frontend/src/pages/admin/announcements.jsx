@@ -235,7 +235,7 @@ export default function Announcements() {
         : "Share important updates and notices with university students.";
     const canNotifyForEvents =
         user?.role === "admin" &&
-        ["usg", "department"].includes(adminType);
+        ["usg", "department", "osse"].includes(adminType);
 
     const [announcements, setAnnouncements] = useState([]);
     const [upcomingEvents, setUpcomingEvents] = useState([]);
@@ -342,7 +342,7 @@ export default function Announcements() {
                             ? null
                             : Number(adminDeptId);
                     const isManagedEvent =
-                        adminType === "usg"
+                        ["usg", "osse"].includes(adminType)
                             ? eventDeptId === null
                             : eventDeptId === accountDeptId &&
                               accountDeptId !== null;
