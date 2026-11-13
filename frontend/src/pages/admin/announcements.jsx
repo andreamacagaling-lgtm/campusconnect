@@ -497,7 +497,7 @@ export default function Announcements() {
                 );
             } else if (!response.data?.email_notification) {
                 setError(
-                    "Announcement published, but the server did not confirm email delivery. Check the deployed backend email settings."
+                    "Announcement published, but the connected backend did not return an email delivery result. Redeploy the latest backend to Render, then verify MAIL_TRANSPORT and its provider settings in Render Environment."
                 );
             } else {
                 notifySuccess(

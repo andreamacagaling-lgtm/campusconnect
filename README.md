@@ -371,6 +371,10 @@ port 465), `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, and
 `SMTP_FROM_NAME` customize local SMTP. The announcement remains published if
 email delivery fails; the API reports the delivery result to the admin, and
 server logs contain provider error details.
+If the admin page says the backend did not return an email delivery result,
+redeploy the latest backend to Render; the announcement API response must
+include its `email_notification` status. Configure the selected mail transport
+and provider credentials in Render's Environment settings, not Vercel.
 
 Event-specific announcement and event-start emails use the selected
 `MAIL_TRANSPORT` too. Set `STUDENT_PORTAL_URL` to the frontend's Events page URL
