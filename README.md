@@ -350,11 +350,22 @@ department announcements are scoped to students in that department.
 Department admins can publish from the Announcements item in their department
 dashboard. The phone and desktop announcement forms use the same
 server-side email delivery flow. On Render Free, SMTP ports are blocked, so set
-`MAIL_TRANSPORT=resend`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL` in the
-backend service's Environment settings. Verify the sender domain with Resend
-before sending; use `RESEND_FROM_NAME` to customize its display name. Do not
-put these values in Vercel or commit secrets. Local development can keep using
-`MAIL_TRANSPORT=smtp` with `MAIL_USERNAME` and a Gmail App Password.
+`MAIL_TRANSPORT=gmail_api` in the backend service's Environment settings to
+send as Gmail over HTTPS without purchasing a sender domain. Enable the Gmail
+API in Google Cloud, then set `GMAIL_OAUTH_CLIENT_ID` (or reuse
+`GOOGLE_OAUTH_CLIENT_ID`), `GMAIL_OAUTH_CLIENT_SECRET`,
+`GMAIL_OAUTH_REFRESH_TOKEN`, and `GMAIL_FROM_EMAIL` to the authorized Gmail
+account. The OAuth app needs the `https://developers.google.com/oauthplayground`
+redirect URI when using OAuth 2.0 Playground. In the Playground, select **Use
+your own OAuth credentials**, authorize the `https://www.googleapis.com/auth/gmail.send`
+scope with the sender account, exchange the code, and copy the refresh token.
+Keep the client secret and refresh token in Render only, never Vercel or source
+control. Google can require consent-screen verification for production use;
+refresh tokens for external apps left in Testing can expire after seven days.
+Local development can keep using `MAIL_TRANSPORT=smtp` with `MAIL_USERNAME` and
+a Gmail App Password.
+Alternatively, Render Free can use `MAIL_TRANSPORT=resend` with a verified
+Resend sender domain. Do not commit provider secrets.
 `SMTP_HOST`, `SMTP_PORT`, `SMTP_ENCRYPTION` (`tls` for port 587 or `ssl` for
 port 465), `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, and
 `SMTP_FROM_NAME` customize local SMTP. The announcement remains published if
