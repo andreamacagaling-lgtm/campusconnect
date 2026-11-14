@@ -46,6 +46,9 @@ class EventsController extends Controller
                     return;
                 }
 
+                require_once APP_DIR . 'libraries/EventStatusService.php';
+                $event = EventStatusService::apply($event);
+
                 $this->api->respond([
                     'success' => true,
                     'data' => $event
@@ -68,6 +71,14 @@ class EventsController extends Controller
             );
 
             $allEvents = array_values($allEvents);
+
+            require_once APP_DIR . 'libraries/EventStatusService.php';
+            $allEvents = array_map(
+                function ($event) {
+                    return EventStatusService::apply($event);
+                },
+                $allEvents
+            );
 
             $this->api->respond([
                 'success' => true,

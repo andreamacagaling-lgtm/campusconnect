@@ -23,6 +23,8 @@ class StudentPortalController extends Controller
         }
 
         try {
+            require_once APP_DIR . 'libraries/EventStatusService.php';
+
             $profile = $this->db->raw(
                 'SELECT
                     u.user_id,
@@ -123,6 +125,7 @@ class StudentPortalController extends Controller
             foreach ($events as &$event) {
                 $event['event_id'] = (int) $event['event_id'];
                 $event['is_registered'] = $event['event_reg_id'] !== null;
+                $event = EventStatusService::apply($event);
             }
             unset($event);
 
