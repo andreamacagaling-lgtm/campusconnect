@@ -17,11 +17,11 @@ class EventAnnouncementMailer
 
         if (!in_array(
             $transport,
-            ['smtp', 'resend', 'gmail_api', 'google_apps_script'],
+            ['smtp', 'resend', 'gmail_api'],
             true
         )) {
             throw new RuntimeException(
-                'MAIL_TRANSPORT must be set to smtp, resend, gmail_api, or google_apps_script.'
+                'MAIL_TRANSPORT must be set to smtp, resend, or gmail_api.'
             );
         }
 
@@ -75,17 +75,14 @@ class EventAnnouncementMailer
             );
         }
 
-        if ($transport !== 'google_apps_script') {
-            $autoload = ROOT_DIR . 'vendor/autoload.php';
+        $autoload = ROOT_DIR . 'vendor/autoload.php';
 
-            if (!is_file($autoload)) {
-                throw new RuntimeException(
-                    'Composer dependencies are missing from the backend.'
-                );
-            }
-
-            require_once $autoload;
+        if (!is_file($autoload)) {
+            throw new RuntimeException(
+                'Composer dependencies are missing from the backend.'
+            );
         }
+        require_once $autoload;
 
         $validRecipients = [];
         $invalidEmails = [];
@@ -136,72 +133,6 @@ class EventAnnouncementMailer
             $portalUrl,
             $isEventStart
         );
-
-        if ($transport === 'google_apps_script') {
-            $deliveryPath = APP_DIR . 'libraries/GoogleAppsScriptDelivery.php';
-
-            if (!is_file($deliveryPath)) {
-                throw new RuntimeException(
-                    'GoogleAppsScriptDelivery.php was not found.'
-                );
-            }
-
-            require_once $deliveryPath;
-
-            $sentEmails = [];
-            $failedEmails = [];
-            $firstError = null;
-
-            foreach (array_chunk($validRecipients, 40) as $batchIndex => $batch) {
-                try {
-                    $error = GoogleAppsScriptDelivery::send(
-                        $batch,
-                        $subject,
-                        $html,
-                        $text
-                    );
-
-                    if ($error === null) {
-                        $sentEmails = array_merge($sentEmails, $batch);
-                        continue;
-                    }
-
-                    $firstError = $firstError ?? $error;
-
-                    $failedEmails = array_merge(
-                        $failedEmails,
-                        $batch
-                    );
-
-                    error_log(
-                        'EventAnnouncementMailer Google Apps Script batch ' .
-                        ($batchIndex + 1) . ' failed: ' . $error
-                    );
-
-                } catch (\Throwable $e) {
-                    $firstError = $firstError ?? $e->getMessage();
-
-                    $failedEmails = array_merge(
-                        $failedEmails,
-                        $batch
-                    );
-
-                    error_log(
-                        'EventAnnouncementMailer Google Apps Script batch ' .
-                        ($batchIndex + 1) . ' exception: ' . $e->getMessage()
-                    );
-                }
-            }
-
-            return [
-                'sent' => count($sentEmails),
-                'failed' => $failed + count($failedEmails),
-                'sent_emails' => $sentEmails,
-                'failed_emails' => $failedEmails,
-                'invalid_emails' => $invalidEmails,
-                'error_message' => $firstError
-            ];
-        }
 
         if ($transport === 'resend' || $transport === 'gmail_api') {
             $deliveryClass = $transport === 'resend'

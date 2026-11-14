@@ -63,16 +63,6 @@ class EmailService
 
         $transport = strtolower(trim((string) (getenv('MAIL_TRANSPORT') ?: 'smtp')));
 
-        if ($transport === 'google_apps_script') {
-            return self::send_via_google_apps_script(
-                $validRecipients,
-                $invalidCount,
-                $subject,
-                $title,
-                $content
-            );
-        }
-
         $autoload = ROOT_DIR . 'vendor/autoload.php';
         if (!is_file($autoload)) {
             error_log('EmailService: Composer autoload file was not found.');
@@ -106,7 +96,7 @@ class EmailService
         if ($transport !== 'smtp') {
             return self::failed_delivery(
                 count($validRecipients) + $invalidCount,
-                'MAIL_TRANSPORT must be set to smtp, resend, gmail_api, or google_apps_script.'
+                'MAIL_TRANSPORT must be set to smtp, resend, or gmail_api.'
             );
         }
 
@@ -329,64 +319,4 @@ class EmailService
         ];
     }
 
-    private static function send_via_google_apps_script(
-        array $recipients,
-        $invalidCount,
-        $subject,
-        $title,
-        $content
-    ) {
-        require_once APP_DIR . 'libraries/GoogleAppsScriptDelivery.php';
-
-        $safeTitle = htmlspecialchars(
-            (string) $title,
-            ENT_QUOTES | ENT_SUBSTITUTE,
-            'UTF-8'
-        );
-        $safeContent = nl2br(htmlspecialchars(
-            (string) $content,
-            ENT_QUOTES | ENT_SUBSTITUTE,
-            'UTF-8'
-        ));
-        $html = '<!doctype html><html><body>' .
-            '<h2>CampusConnect</h2><h3>' . $safeTitle . '</h3>' .
-            '<p>' . $safeContent . '</p>' .
-            '<p>Log in to CampusConnect to read the announcement.</p>' .
-            '</body></html>';
-        $text = (string) $title . "\n\n" . (string) $content .
-            "\n\nLog in to CampusConnect to read the announcement.";
-
-        $sent = 0;
-        $failed = $invalidCount;
-        $firstError = null;
-        foreach (array_chunk($recipients, 40) as $batchIndex => $batch) {
-            $error = GoogleAppsScriptDelivery::send(
-                $batch,
-                $subject,
-                $html,
-                $text
-            );
-            if ($error === null) {
-                $sent += count($batch);
-                continue;
-            }
-
-            $failed += count($batch);
-            $firstError = $firstError ?? $error;
-            error_log(
-                'EmailService Google Apps Script batch ' . ($batchIndex + 1) .
-                ' failed: ' . $error
-            );
-        }
-
-        return [
-            'success' => $failed === 0,
-            'sent' => $sent,
-            'failed' => $failed,
-            'message' => $failed === 0
-                ? 'Announcement email sent.'
-                : 'Some announcement emails could not be delivered. ' .
-                    ($firstError ?? 'Check the backend logs.')
-        ];
-    }
 }

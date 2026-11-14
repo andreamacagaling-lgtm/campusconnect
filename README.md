@@ -349,9 +349,11 @@ flow and notify active student accounts with registered email addresses;
 department announcements are scoped to students in that department.
 Department admins can publish from the Announcements item in their department
 dashboard. The phone and desktop announcement forms use the same
-server-side email delivery flow. On Render Free, SMTP ports are blocked, so set
-`MAIL_TRANSPORT=gmail_api` in the backend service's Environment settings to
-send as Gmail over HTTPS without purchasing a sender domain. Enable the Gmail
+server-side email delivery flow. SMTP is the default mail transport. Configure
+`MAIL_TRANSPORT=smtp`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`,
+`MAIL_PASSWORD`, and `MAIL_FROM_NAME` in the backend environment. On Render
+Free, SMTP ports are blocked; if using that host, set `MAIL_TRANSPORT=gmail_api`
+to send as Gmail over HTTPS without purchasing a sender domain. Enable the Gmail
 API in Google Cloud, then set `GMAIL_OAUTH_CLIENT_ID` (or reuse
 `GOOGLE_OAUTH_CLIENT_ID`), `GMAIL_OAUTH_CLIENT_SECRET`,
 `GMAIL_OAUTH_REFRESH_TOKEN`, and `GMAIL_FROM_EMAIL` to the authorized Gmail
@@ -366,17 +368,11 @@ Local development can keep using `MAIL_TRANSPORT=smtp` with `MAIL_USERNAME` and
 a Gmail App Password.
 Alternatively, Render Free can use `MAIL_TRANSPORT=resend` with a verified
 Resend sender domain. Do not commit provider secrets.
-Google Apps Script is another Render-compatible option: set
-`MAIL_TRANSPORT=google_apps_script`, `GOOGLE_APPS_SCRIPT_URL` to the deployed
-Web App URL ending in `/exec`, and `GOOGLE_APPS_SCRIPT_SECRET` to the same
-shared secret configured in the script. Set these in the Render backend's
-Environment settings, not Vercel; the backend Docker image requires PHP cURL
-for this transport.
 `SMTP_HOST`, `SMTP_PORT`, `SMTP_ENCRYPTION` (`tls` for port 587 or `ssl` for
 port 465), `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, and
-`SMTP_FROM_NAME` customize local SMTP. The announcement remains published if
-email delivery fails; the API reports the delivery result to the admin, and
-server logs contain provider error details.
+`SMTP_FROM_NAME` customize the SMTP connection. The announcement remains
+published if email delivery fails; the API reports the delivery result to the
+admin, and server logs contain provider error details.
 If the admin page says the backend did not return an email delivery result,
 redeploy the latest backend to Render; the announcement API response must
 include its `email_notification` status. Configure the selected mail transport
