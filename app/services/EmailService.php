@@ -162,10 +162,10 @@ class EmailService
         $mailer->Body = '<!doctype html><html><body>' .
             '<h2>CampusConnect</h2><h3>' . $safeTitle . '</h3>' .
             '<p>' . $safeContent . '</p>' .
-            '<p>Log in to CampusConnect to read the announcement.</p>' .
+            '<p>This is an automated message from CampusConnect.</p>' .
             '</body></html>';
         $mailer->AltBody = (string) $title . "\n\n" . (string) $content .
-            "\n\nLog in to CampusConnect to read the announcement.";
+            "\n\nThis is an automated message from CampusConnect.";
 
         $sent = 0;
         $failed = $invalidCount;
@@ -229,10 +229,10 @@ class EmailService
         $html = '<!doctype html><html><body>' .
             '<h2>CampusConnect</h2><h3>' . $safeTitle . '</h3>' .
             '<p>' . $safeContent . '</p>' .
-            '<p>Log in to CampusConnect to read the announcement.</p>' .
+            '<p>This is an automated message from CampusConnect.</p>' .
             '</body></html>';
         $text = (string) $title . "\n\n" . (string) $content .
-            "\n\nLog in to CampusConnect to read the announcement.";
+            "\n\nThis is an automated message from CampusConnect.";
 
         $sent = 0;
         $failed = $invalidCount;
@@ -285,10 +285,10 @@ class EmailService
         $html = '<!doctype html><html><body>' .
             '<h2>CampusConnect</h2><h3>' . $safeTitle . '</h3>' .
             '<p>' . $safeContent . '</p>' .
-            '<p>Log in to CampusConnect to read the announcement.</p>' .
+            '<p>This is an automated message from CampusConnect.</p>' .
             '</body></html>';
         $text = (string) $title . "\n\n" . (string) $content .
-            "\n\nLog in to CampusConnect to read the announcement.";
+            "\n\nThis is an automated message from CampusConnect.";
 
         $sent = 0;
         $failed = $invalidCount;

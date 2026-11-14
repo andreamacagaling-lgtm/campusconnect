@@ -213,7 +213,9 @@ class OrganizationsController extends Controller
 
         try {
             $sql = '
-                SELECT r.reg_id, r.status, o.dept_id AS organization_dept_id,
+                SELECT r.reg_id, r.status, o.org_name,
+                    o.dept_id AS organization_dept_id,
+                    u.full_name, u.email,
                     COALESCE(u.dept_id, s.dept_id) AS dept_id
                 FROM org_registrations r
                 INNER JOIN organizations o ON o.org_id = r.org_id
@@ -274,9 +276,60 @@ class OrganizationsController extends Controller
                 return;
             }
 
+            $emailNotification = null;
+            if ($status === 'approved') {
+                try {
+                    require_once APP_DIR . 'services/EmailService.php';
+                    $emailNotification = EmailService::sendEmails(
+                        [$request['email']],
+                        'Membership application approved: ' .
+                            $request['org_name'],
+                        'Your membership application was approved',
+                        'Hello ' . ($request['full_name'] ?: 'Student') . ',' .
+                            "\n\nYour application to join " .
+                            $request['org_name'] .
+                            ' has been approved.' .
+                            "\n\nYou may now claim your membership slip " .
+                            'from the organization and proceed with payment. ' .
+                            'Please contact the organization officers for ' .
+                            'the slip pickup location, payment amount, ' .
+                            'deadline, and accepted payment methods.' .
+                            "\n\nThank you,\nCampusConnect"
+                    );
+
+                    if (!$emailNotification['success']) {
+                        error_log(
+                            'OrganizationsController update_membership_status: ' .
+                            'approval email delivery failed for application ' .
+                            (int) $id . ': ' . $emailNotification['message']
+                        );
+                    }
+                } catch (Throwable $e) {
+                    error_log(
+                        'OrganizationsController update_membership_status: ' .
+                        'approval email delivery failed for application ' .
+                        (int) $id . ': ' . $e->getMessage()
+                    );
+                    $emailNotification = [
+                        'success' => false,
+                        'message' => 'The membership approval email could not be sent.'
+                    ];
+                }
+            }
+
             $this->api->respond([
                 'success' => true,
-                'message' => 'Membership application ' . $status . '.'
+                'message' => $status === 'approved' &&
+                    $emailNotification !== null &&
+                    !$emailNotification['success']
+                        ? 'Membership approved, but the email notification could not be sent.'
+                        : 'Membership application ' . $status . '.',
+                'email_notification' => $emailNotification === null
+                    ? null
+                    : [
+                        'success' => $emailNotification['success'],
+                        'message' => $emailNotification['message']
+                    ]
             ], 200);
         } catch (Throwable $e) {
             error_log(

@@ -4,7 +4,8 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { confirmLogout } from "../../authSession";
 import ResponsiveSidebarToggle from "../../components/ResponsiveSidebarToggle";
-import { notifySuccess } from "../../notifications";
+import { notifyError, notifySuccess } from "../../notifications";
+import "./Announcements.css";
 import "./Organizations.css";
 
 const API_BASE_URL =
@@ -400,10 +401,17 @@ export default function Organizations({ expectedDepartmentId = null } = {}) {
                 { status },
                 { headers: getHeaders() }
             );
-            notifySuccess(
-                response.data?.message ||
-                    `Membership application ${status}.`
-            );
+            if (response.data?.email_notification?.success === false) {
+                notifyError(
+                    response.data?.message ||
+                        "Membership approved, but the email notification could not be sent."
+                );
+            } else {
+                notifySuccess(
+                    response.data?.message ||
+                        `Membership application ${status}.`
+                );
+            }
             await fetchMembershipRequests();
         } catch (err) {
             if (!handleUnauthorized(err)) {
